@@ -1,0 +1,9 @@
+{
+  "name": "@dles-night/shared",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}
