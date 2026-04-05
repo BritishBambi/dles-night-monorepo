@@ -1,7 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain, session, WebContentsView } from 'electron'
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+const { app, shell, BrowserWindow, ipcMain, session, WebContentsView } = require('electron')
+const { join } = require('path')
+const icon = join(__dirname, '../../resources/icon.png')
 
 let mainWindow = null
 let dleView = null
@@ -33,7 +32,7 @@ function createWindow() {
     return { action: 'deny' }
   })
 
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
@@ -41,11 +40,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  app.setAppUserModelId('com.jojo.dlesnightapp')
 
   // Strip headers that block iframe/webview embedding
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

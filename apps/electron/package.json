@@ -11,17 +11,14 @@
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "postinstall": "electron-builder install-app-deps",
-    "build:unpack": "npm run build && electron-builder --dir",
+"build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@dles-night/shared": "*",
-    "@electron-toolkit/preload": "^3.0.2",
-    "@electron-toolkit/utils": "^4.0.0",
-    "@tailwindcss/vite": "^4.2.2",
+"@tailwindcss/vite": "^4.2.2",
     "electron-updater": "^6.3.9",
     "tailwindcss": "^4.2.2"
   },
