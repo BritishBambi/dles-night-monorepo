@@ -1,0 +1,1118 @@
+import { useState, useRef, useEffect } from 'react'
+import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase } from '@dles-night/shared'
+
+const SESSION_ID = 'nightsession'
+
+const DLES = [
+  { name: 'Poople', url: 'https://poople.io' },
+  { name: 'Heardle 2020s', url: 'https://20s.heardledecades.com' },
+  { name: 'Heardle 2010s', url: 'https://heardle10s.com' },
+  { name: 'Heardle 2000s', url: 'https://00s.heardledecades.com' },
+  { name: 'Heardle 1990s', url: 'https://90s.heardledecades.com' },
+  { name: 'Heardle 1980s', url: 'https://80s.heardledecades.com' },
+  { name: 'Heardle TV Themes', url: 'https://tv.heardledecades.xyz' },
+  { name: 'Bandle', url: 'https://bandle.app' },
+  { name: 'Crosstune', url: 'https://crosstune.io' },
+  { name: 'Scrandle', url: 'https://scrandle.com' },
+  { name: 'LinkedIn Pinpoint', url: 'https://www.linkedin.com/games/pinpoint' },
+  { name: 'Adoptle', url: 'https://tryhardguides.com/adoptle' },
+  { name: 'Movie Grid', url: 'https://moviegrid.io' },
+  { name: 'Cine2Nerdle', url: 'https://www.cinenerdle2.app' },
+  { name: 'Redactle', url: 'https://redactle.net' },
+  { name: 'Contexto', url: 'https://contexto.me' },
+]
+
+function StickyNote({ note, onMove, onDelete }) {
+  const ref = useRef(null)
+  const dragging = useRef(false)
+  const offset = useRef({ x: 0, y: 0 })
+
+  const onMouseDown = (e) => {
+    if (e.target.closest('button')) return
+    dragging.current = true
+    offset.current = {
+      x: e.clientX - note.x,
+      y: e.clientY - note.y
+    }
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!dragging.current) return
+      onMove(note.id, e.clientX - offset.current.x, e.clientY - offset.current.y)
+    }
+    const onMouseUp = () => { dragging.current = false }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [note.id, onMove])
+
+  return (
+    <div
+      ref={ref}
+      onMouseDown={onMouseDown}
+      className="absolute pointer-events-auto select-none w-48 bg-gray-900 border rounded-xl shadow-lg p-3 flex flex-col gap-1 cursor-grab active:cursor-grabbing"
+      style={{ left: note.x, top: note.y, borderColor: note.colour }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold" style={{ color: note.colour }}>
+          {note.username}
+        </span>
+        <button
+          onClick={() => onDelete(note.id)}
+          className="text-gray-600 hover:text-red-400 text-xs leading-none"
+        >
+          ✕
+        </button>
+      </div>
+      <p className="text-sm text-gray-200 break-words">{note.text}</p>
+    </div>
+  )
+}
+
+function App() {
+  const [mode, setMode] = useState(null) // null | 'host' | 'viewer'
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [streaming, setStreaming] = useState(false)
+  const [streamEnded, setStreamEnded] = useState(false)
+  const [viewerStream, setViewerStream] = useState(null)
+  const [activeTool, setActiveTool] = useState('pen')
+  const [activeColour, setActiveColour] = useState('#E8500A')
+  const [drawMode, setDrawMode] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameSet, setUsernameSet] = useState(false)
+  const [usernameColour, setUsernameColour] = useState('#E8500A')
+  const [sessionResults, setSessionResults] = useState([])
+  const [winRate, setWinRate] = useState(null)
+  const [notes, setNotes] = useState({})
+  const [sessionNotes, setSessionNotes] = useState([])
+  const [newNoteText, setNewNoteText] = useState('')
+  const [showNoteInput, setShowNoteInput] = useState(false)
+  const [showRecap, setShowRecap] = useState(false)
+  const [sessionComplete, setSessionComplete] = useState(false)
+  const [connectedUsers, setConnectedUsers] = useState([])
+  const [copied, setCopied] = useState(false)
+  const rtcRef = useRef(null)
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const dlePanelRef = useRef(null)
+
+  // Check if we're in Electron (WebContentsView available)
+  const isElectron = typeof window !== 'undefined' && !!window.api?.dleView
+  const sharedCanvasRef = useRef(null)
+  const chatRef = useRef(null)
+  const messagesEndRef = useRef(null)
+  const notesRef = useRef(null)
+  const recapRef = useRef(null)
+  const sessionSyncRef = useRef(null)
+  const currentIndexRef = useRef(currentIndex)
+  const [toolbarPos, setToolbarPos] = useState({ x: 16, y: 80 })
+  const toolbarDragging = useRef(false)
+  const toolbarOffset = useRef({ x: 0, y: 0 })
+
+  const isFirst = currentIndex === 0
+  const isLast = currentIndex === DLES.length - 1
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1)
+      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
+      if (notesRef.current) notesRef.current.clearAll()
+    }
+  }
+
+  const handleNext = () => {
+    if (currentIndex < DLES.length - 1) {
+      setCurrentIndex(prev => prev + 1)
+      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
+      if (notesRef.current) notesRef.current.clearAll()
+    }
+  }
+
+  const joinAsViewer = async () => {
+    setMode('viewer')
+    rtcRef.current = new DlesRTC((stream) => {
+      setViewerStream(stream)
+    }, SESSION_ID)
+    await rtcRef.current.joinAsViewer()
+  }
+
+  const startStreaming = async () => {
+    try {
+      rtcRef.current = new DlesRTC(null, SESSION_ID)
+
+      // In Electron, getDisplayMedia is intercepted by setDisplayMediaRequestHandler
+      // in main process — it automatically provides the WebContentsView as the source
+      // with loopback audio. No picker dialog appears.
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      })
+
+      rtcRef.current.localStream = stream
+      rtcRef.current.isHost = true
+
+      await rtcRef.current.startBroadcastWithStream(stream)
+
+      stream.getVideoTracks()[0].onended = () => {
+        setStreaming(false)
+        setStreamEnded(true)
+      }
+      setStreaming(true)
+      setStreamEnded(false)
+    } catch (err) {
+      console.error('Failed to start streaming:', err)
+    }
+  }
+
+  const restartStreaming = async () => {
+    if (rtcRef.current) rtcRef.current.disconnect()
+    await startStreaming()
+  }
+
+  useEffect(() => {
+    if (videoRef.current && viewerStream) {
+      videoRef.current.srcObject = viewerStream
+    }
+  }, [viewerStream])
+
+  useEffect(() => {
+    return () => {
+      if (rtcRef.current) rtcRef.current.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex
+  }, [currentIndex])
+
+  // Create WebContentsView when entering host mode
+  useEffect(() => {
+    if (mode !== 'host' || !isElectron) return
+
+    const setup = async () => {
+      await window.api.dleView.create()
+      await window.api.dleView.navigate(DLES[currentIndex].url)
+    }
+    setup()
+
+    return () => {
+      window.api.dleView.destroy()
+    }
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Navigate WebContentsView when currentIndex changes
+  useEffect(() => {
+    if (mode !== 'host' || !isElectron) return
+    window.api.dleView.navigate(DLES[currentIndex].url)
+  }, [currentIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track bounds of the dle panel placeholder and sync to main process
+  useEffect(() => {
+    if (mode !== 'host' || !isElectron || !dlePanelRef.current) return
+
+    const updateBounds = () => {
+      const el = dlePanelRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      window.api.dleView.setBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      })
+    }
+
+    const timer = setTimeout(updateBounds, 100)
+    const observer = new ResizeObserver(updateBounds)
+    observer.observe(dlePanelRef.current)
+    window.addEventListener('resize', updateBounds)
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+      window.removeEventListener('resize', updateBounds)
+    }
+  }, [mode, sessionComplete]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hide/show WebContentsView when session completes or recap is shown
+  useEffect(() => {
+    if (!isElectron) return
+    if (sessionComplete || showRecap) {
+      window.api.dleView.hide()
+    } else if (mode === 'host') {
+      window.api.dleView.show()
+    }
+  }, [sessionComplete, showRecap]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mode) return
+    fetchWinRate()
+  }, [mode])
+
+  useEffect(() => {
+    if (!mode) return
+
+    const ss = new SessionSync(
+      (event) => {
+        if (event.type === 'result') {
+          setSessionResults(event.sessionResults)
+          if (event.winRate) setWinRate(event.winRate)
+        }
+        if (event.type === 'advance') {
+          setCurrentIndex(event.currentIndex)
+        }
+        if (event.type === 'end-session') {
+          setSessionResults(event.sessionResults)
+          if (event.winRate) setWinRate(event.winRate)
+          setShowRecap(true)
+        }
+        if (event.type === 'state-request' && mode === 'host') {
+          sessionSyncRef.current?.broadcastState(
+            sessionResults,
+            currentIndex,
+            sessionComplete
+          )
+        }
+        if (event.type === 'state-sync' && mode === 'viewer') {
+          setSessionResults(event.sessionResults)
+          setCurrentIndex(event.currentIndex)
+          if (event.sessionComplete) setSessionComplete(true)
+        }
+      },
+      (users) => setConnectedUsers(users),
+    )
+
+    sessionSyncRef.current = ss
+    ss.connect(username, usernameColour)
+
+    return () => ss.disconnect()
+  }, [mode])
+
+  const fetchWinRate = async () => {
+    const { data } = await supabase.from('win_rate').select('*').single()
+    if (data) setWinRate(data)
+  }
+
+  const handleResult = async (result) => {
+    if (sessionComplete) return
+
+    const dle = DLES[currentIndex]
+    const entry = { name: dle.name, url: dle.url, result }
+    const newResults = [...sessionResults, entry]
+    setSessionResults(newResults)
+
+    let updatedWinRate = winRate
+    try {
+      const { data, error } = await supabase.from('win_rate').select('*').single()
+      if (error) throw error
+      await supabase
+        .from('win_rate')
+        .update({
+          total_played: data.total_played + 1,
+          total_won: result === 'win' ? data.total_won + 1 : data.total_won,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.id)
+      updatedWinRate = {
+        ...data,
+        total_played: data.total_played + 1,
+        total_won: result === 'win' ? data.total_won + 1 : data.total_won,
+      }
+      setWinRate(updatedWinRate)
+    } catch (err) {
+      console.error('Failed to update win rate:', err)
+    }
+
+    if (currentIndex < DLES.length - 1) {
+      const nextIndex = currentIndex + 1
+      setCurrentIndex(nextIndex)
+      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
+      if (notesRef.current) notesRef.current.clearAll()
+      sessionSyncRef.current?.broadcastResult(entry, nextIndex, newResults, updatedWinRate)
+      sessionSyncRef.current?.broadcastAdvance(nextIndex)
+    } else {
+      setSessionComplete(true)
+      sessionSyncRef.current?.broadcastResult(entry, currentIndex, newResults, updatedWinRate)
+    }
+  }
+
+  useEffect(() => {
+    if (!mode) return
+    const sn = new StickyNotes((updatedNotes) => {
+      setNotes(updatedNotes)
+      // Add any new notes to the session log
+      setSessionNotes(prev => {
+        const existingIds = new Set(prev.map(n => n.id))
+        const newNotes = Object.values(updatedNotes).filter(n => !existingIds.has(n.id))
+        if (newNotes.length === 0) return prev
+        return [...prev, ...newNotes.map(n => ({
+          ...n,
+          dleName: DLES[currentIndexRef.current]?.name || 'Unknown'
+        }))]
+      })
+    })
+    notesRef.current = sn
+    sn.connect()
+    return () => sn.disconnect()
+  }, [mode])
+
+  useEffect(() => {
+    if (!mode || !usernameSet) return
+    const chat = new SessionChat((msg) => {
+      setMessages(prev => [...prev, msg])
+    })
+    chatRef.current = chat
+    chat.connect()
+    return () => chat.disconnect()
+  }, [mode, usernameSet])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    if (!mode || !canvasRef.current) return
+
+    const canvas = canvasRef.current
+
+    // Size the canvas to the full viewport explicitly
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    // Init the shared canvas after sizing
+    const userId = rtcRef.current?.viewerId || crypto.randomUUID()
+    const sc = new SharedCanvas(canvas, userId)
+    sharedCanvasRef.current = sc
+    sc.connect().then(() => sc.attachListeners())
+
+    // Handle resize without clearing canvas content
+    const handleResize = () => {
+      // Save current drawing
+      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+      canvas.getContext('2d').putImageData(imageData, 0, 0)
+    }
+
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      sc.disconnect()
+    }
+  }, [mode])
+
+  const handleEndSession = async () => {
+    // Hide the WebContentsView so the recap screen is visible
+    if (isElectron) {
+      await window.api.dleView.hide()
+    }
+
+    const { data } = await supabase.from('win_rate').select('*').single()
+    const currentWinRate = data || winRate
+    setWinRate(currentWinRate)
+    sessionSyncRef.current?.broadcastEndSession(sessionResults, currentWinRate)
+    setShowRecap(true)
+  }
+
+  const copyResult = () => {
+    const tonightWins = sessionResults.filter(r => r.result === 'win').length
+    const tonightPct = sessionResults.length > 0
+      ? Math.round((tonightWins / sessionResults.length) * 100) : 0
+    const allTimePct = winRate?.total_played > 0
+      ? Math.round((winRate.total_won / winRate.total_played) * 100) : 0
+
+    const resultLines = sessionResults.map(r =>
+      `${r.result === 'win' ? '✅' : '❌'} ${r.name}`
+    ).join('\n')
+
+    const userLine = connectedUsers.length > 0
+      ? `\n👥 Tonight's crew: ${connectedUsers.map(u => u.username).join(', ')}`
+      : ''
+
+    const text = `🎮 Dles Night — ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+
+${resultLines}
+
+🏆 Tonight: ${tonightWins}/${sessionResults.length} (${tonightPct}%)
+📊 All Time: ${winRate ? `${winRate.total_won}/${winRate.total_played}` : '—'} (${allTimePct}%)${userLine}
+
+powered by Jojo labs`
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  const submitNote = () => {
+    if (!newNoteText.trim() || !notesRef.current) return
+    notesRef.current.addNote(username, usernameColour, newNoteText.trim())
+    setNewNoteText('')
+    setShowNoteInput(false)
+  }
+
+  const sendMessage = () => {
+    if (!chatInput.trim() || !chatRef.current) return
+    chatRef.current.send(username, chatInput, usernameColour)
+    setChatInput('')
+  }
+
+  const onToolbarMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('input')) return
+    toolbarDragging.current = true
+    toolbarOffset.current = {
+      x: e.clientX - toolbarPos.x,
+      y: e.clientY - toolbarPos.y
+    }
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!toolbarDragging.current) return
+      setToolbarPos({
+        x: e.clientX - toolbarOffset.current.x,
+        y: e.clientY - toolbarOffset.current.y
+      })
+    }
+    const onMouseUp = () => { toolbarDragging.current = false }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [])
+
+  // Username prompt
+  if (!usernameSet) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-6">
+        <h1 className="text-4xl font-bold text-orange-500">Dles Night</h1>
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-gray-400">What's your name?</p>
+          <input
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && username.trim() && setUsernameSet(true)}
+            placeholder="Enter your name..."
+            className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 w-64 text-center"
+            autoFocus
+          />
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-gray-400">Pick your colour</p>
+
+            {/* Hidden native colour input */}
+            <input
+              type="color"
+              id="username-colour-picker"
+              value={usernameColour}
+              onChange={e => setUsernameColour(e.target.value)}
+              className="sr-only"
+            />
+
+            {/* Visible styled button that triggers it */}
+            <button
+              onClick={() => document.getElementById('username-colour-picker').click()}
+              className="relative w-12 h-12 rounded-full hover:scale-110 transition-transform"
+              style={{
+                background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+                padding: '2px'
+              }}
+              title="Pick a colour"
+            >
+              <span
+                className="block w-full h-full rounded-full"
+                style={{ backgroundColor: usernameColour }}
+              />
+            </button>
+
+            {/* Quick presets */}
+            <div className="flex gap-2 flex-wrap justify-center">
+              {['#E8500A','#f472b6','#4ade80','#60a5fa','#facc15',
+                '#c084fc','#fb7185','#34d399','#ffffff','#ef4444',
+                '#a855f7','#f97316','#06b6d4','#84cc16'].map(c => (
+                <button
+                  key={c}
+                  onClick={() => setUsernameColour(c)}
+                  className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{
+                    backgroundColor: c,
+                    borderColor: usernameColour === c ? 'white' : 'transparent'
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Live preview */}
+            <p className="text-sm font-semibold" style={{ color: usernameColour }}>
+              {username || 'Your name'}
+            </p>
+          </div>
+          <button
+            onClick={() => username.trim() && setUsernameSet(true)}
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold"
+          >
+            Let's go
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Mode selection screen
+  if (mode === null) {
+    return (
+      <div className="h-screen bg-gray-950 text-white flex flex-col items-center justify-center gap-8">
+        <span className="text-4xl font-bold" style={{ color: '#E8500A' }}>Dles Night</span>
+        <div className="flex gap-6">
+          <button
+            onClick={() => setMode('host')}
+            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium"
+          >
+            I'm Julie 🎮
+          </button>
+          <button
+            onClick={joinAsViewer}
+            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium"
+          >
+            Join Session 👀
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-950 text-white">
+
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 z-10"
+        style={{
+          cursor: drawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : 'default',
+          pointerEvents: drawMode ? 'auto' : 'none'
+        }}
+      />
+
+      {/* Top bar */}
+      <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
+        <span className="text-lg font-bold" style={{ color: '#E8500A' }}>Dles Night</span>
+        <span className="absolute left-1/2 -translate-x-1/2 text-sm text-gray-400">
+          {DLES[currentIndex].name} — Game {currentIndex + 1} of {DLES.length}
+        </span>
+        <div className="ml-auto flex items-center gap-4">
+          {winRate && (
+            <div className="text-sm text-gray-400">
+              All time: <span className="text-orange-400 font-semibold">{winRate.total_won}/{winRate.total_played}</span>
+              <span className="text-gray-600 ml-1">
+                ({winRate.total_played > 0 ? Math.round((winRate.total_won / winRate.total_played) * 100) : 0}%)
+              </span>
+            </div>
+          )}
+          <button
+            onClick={handleEndSession}
+            className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm"
+          >
+            End Session
+          </button>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden w-full">
+
+        {/* Main panel — 75% */}
+        <div className="flex flex-col flex-1 h-full border-r border-gray-800 min-h-0 overflow-hidden">
+
+          {/* Panel area */}
+          <div className="relative flex-1 min-h-0">
+
+            {mode === 'host' ? (
+              sessionComplete ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                  <p className="text-4xl">🎉</p>
+                  <h2 className="text-2xl font-bold text-white">Dles Complete!</h2>
+                  <p className="text-gray-400">End the session for the final summary</p>
+                  <button
+                    onClick={handleEndSession}
+                    className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold mt-2"
+                  >
+                    View Final Summary
+                  </button>
+                </div>
+              ) : isElectron ? (
+                /* WebContentsView placeholder — native layer renders on top of this */
+                <div
+                  ref={dlePanelRef}
+                  className="absolute inset-0 bg-black"
+                />
+              ) : (
+                /* Fallback iframe for web/non-Electron */
+                <div className="absolute inset-0">
+                  <iframe
+                    key={DLES[currentIndex].url}
+                    src={DLES[currentIndex].url}
+                    className="w-full h-full border-0"
+                    title={DLES[currentIndex].name}
+                  />
+                </div>
+              )
+            ) : (
+              // Viewer
+              <>
+                {viewerStream ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+                    Waiting for Julie to start streaming...
+                  </div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 flex justify-center py-2 bg-gray-950">
+                  <button
+                    onClick={async () => {
+                      setViewerStream(null)
+                      await rtcRef.current.reconnect()
+                    }}
+                    className="px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors"
+                  >
+                    ↺ Reconnect Stream
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Navigation + Streaming — host only, below dle panel */}
+          {mode === 'host' && !sessionComplete && (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 bg-gray-950 shrink-0">
+              {/* Prev / Next */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0}
+                  className={`px-4 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold ${currentIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                >
+                  ← Prev
+                </button>
+                <button
+                  onClick={handleNext}
+                  disabled={currentIndex === DLES.length - 1}
+                  className={`px-4 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold ${currentIndex === DLES.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                >
+                  Next →
+                </button>
+              </div>
+
+              {/* Stream controls */}
+              {!streaming ? (
+                <button
+                  onClick={startStreaming}
+                  className="px-4 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors flex items-center gap-2"
+                >
+                  📡 Stream to viewers
+                </button>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs text-gray-400">Streaming to viewers</span>
+                  </div>
+                  <button
+                    onClick={restartStreaming}
+                    className="text-xs text-gray-600 hover:text-gray-400"
+                  >
+                    ↺ Restart
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Win / Fail — host only */}
+          {mode === 'host' && (
+            <>
+              <div className="flex justify-center gap-4 py-3 border-t border-gray-800 shrink-0">
+                <button onClick={() => handleResult('win')} className="px-8 py-2 bg-green-800 hover:bg-green-700 rounded font-medium text-sm">
+                  Win
+                </button>
+                <button onClick={() => handleResult('fail')} className="px-8 py-2 bg-red-900 hover:bg-red-800 rounded font-medium text-sm">
+                  Fail
+                </button>
+              </div>
+              <div className="text-center py-1">
+                <button
+                  onClick={() => window.open(DLES[currentIndex].url, '_blank')}
+                  className="text-xs text-gray-600 hover:text-gray-400"
+                >
+                  ↗ Open {DLES[currentIndex].name} in browser
+                </button>
+              </div>
+            </>
+          )}
+
+        </div>
+
+        {/* Right sidebar — chat */}
+        <div className="w-80 shrink-0 bg-gray-900 border-l border-gray-800 flex flex-col h-full">
+          <div className="px-4 py-3 border-b border-gray-800">
+            <p className="text-sm font-semibold text-gray-300">Chat</p>
+            <p className="text-xs text-gray-500">
+              Chatting as <span style={{ color: usernameColour }}>{username}</span>
+            </p>
+            {connectedUsers.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Online:{' '}
+                {connectedUsers.map((u, i) => (
+                  <span key={u.username}>
+                    <span style={{ color: u.colour }}>{u.username}</span>
+                    {i < connectedUsers.length - 1 && <span className="text-gray-600">, </span>}
+                  </span>
+                ))}
+              </p>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+            {messages.length === 0 && (
+              <p className="text-xs text-gray-600 text-center mt-4">No messages yet...</p>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium" style={{ color: msg.colour || '#E8500A' }}>{msg.username}</span>
+                <span className="text-sm text-gray-200 bg-gray-800 rounded-lg px-3 py-1.5 break-words">{msg.text}</span>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="px-3 py-3 border-t border-gray-800 flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              placeholder="Type a message..."
+              className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+            />
+            <button
+              onClick={sendMessage}
+              className="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-semibold"
+            >
+              →
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Sticky notes overlay */}
+      <div className="fixed inset-0 z-30 pointer-events-none">
+        {Object.values(notes).map(note => (
+          <StickyNote
+            key={note.id}
+            note={note}
+            onMove={(id, x, y) => notesRef.current?.moveNote(id, x, y)}
+            onDelete={(id) => notesRef.current?.deleteNote(id)}
+          />
+        ))}
+      </div>
+
+      {/* Draggable vertical toolbar */}
+      <div
+        onMouseDown={onToolbarMouseDown}
+        className="fixed z-50 flex flex-col items-center gap-2 bg-gray-900/90 backdrop-blur border border-gray-700 rounded-2xl px-2 py-3 shadow-xl cursor-grab active:cursor-grabbing select-none"
+        style={{ left: toolbarPos.x, top: toolbarPos.y }}
+      >
+        {/* Drag handle indicator */}
+        <div className="flex flex-col gap-0.5 mb-1 opacity-40">
+          <div className="w-4 h-0.5 bg-gray-400 rounded" />
+          <div className="w-4 h-0.5 bg-gray-400 rounded" />
+          <div className="w-4 h-0.5 bg-gray-400 rounded" />
+        </div>
+
+        {/* Draw toggle */}
+        <button
+          onClick={() => setDrawMode(prev => !prev)}
+          className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-colors ${drawMode ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+          title={drawMode ? 'Drawing on' : 'Drawing off'}
+        >
+          ✏️
+        </button>
+
+        {/* Pen */}
+        <button
+          onClick={() => { setActiveTool('pen'); sharedCanvasRef.current?.setTool('pen') }}
+          className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${activeTool === 'pen' && drawMode ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+          title="Pen"
+        >
+          🖊
+        </button>
+
+        {/* Eraser */}
+        <button
+          onClick={() => { setActiveTool('eraser'); sharedCanvasRef.current?.setTool('eraser') }}
+          className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${activeTool === 'eraser' && drawMode ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+          title="Eraser"
+        >
+          🧹
+        </button>
+
+        {/* Note */}
+        <button
+          onClick={() => setShowNoteInput(prev => !prev)}
+          className={`w-8 h-8 rounded-lg text-sm transition-colors ${showNoteInput ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+          title="Add note"
+        >
+          📝
+        </button>
+
+        {/* Divider */}
+        <div className="w-4 h-px bg-gray-700 my-1" />
+
+        {/* Rainbow colour picker */}
+        <input
+          type="color"
+          id="toolbar-colour-picker"
+          value={activeColour}
+          onChange={e => {
+            setActiveColour(e.target.value)
+            sharedCanvasRef.current?.setColour(e.target.value)
+          }}
+          className="sr-only"
+        />
+        <button
+          onClick={() => document.getElementById('toolbar-colour-picker').click()}
+          className="relative w-8 h-8 rounded-full hover:scale-110 transition-transform"
+          style={{
+            background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+            padding: '2px'
+          }}
+          title="Pick colour"
+        >
+          <span
+            className="block w-full h-full rounded-full"
+            style={{ backgroundColor: activeColour }}
+          />
+        </button>
+
+        {/* Quick presets — vertical */}
+        {['#E8500A','#ffffff','#facc15','#4ade80','#60a5fa','#f472b6','#ef4444','#a855f7'].map(c => (
+          <button
+            key={c}
+            onClick={() => {
+              setActiveColour(c)
+              sharedCanvasRef.current?.setColour(c)
+            }}
+            className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 flex-shrink-0"
+            style={{
+              backgroundColor: c,
+              borderColor: activeColour === c ? 'white' : 'transparent'
+            }}
+          />
+        ))}
+
+        {/* Divider */}
+        <div className="w-4 h-px bg-gray-700 my-1" />
+
+        {/* Clear */}
+        <button
+          onClick={() => sharedCanvasRef.current?.broadcastClear()}
+          className="w-8 h-8 rounded-lg text-sm bg-gray-700 hover:bg-red-900 text-gray-300 hover:text-white transition-colors"
+          title="Clear canvas"
+        >
+          🗑
+        </button>
+      </div>
+
+      {/* Note input popup — position near toolbar */}
+      {showNoteInput && (
+        <div
+          className="fixed z-50 bg-gray-900 border border-gray-700 rounded-xl p-3 flex gap-2 shadow-xl w-72"
+          style={{ left: toolbarPos.x + 56, top: toolbarPos.y }}
+        >
+          <input
+            type="text"
+            value={newNoteText}
+            onChange={e => setNewNoteText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submitNote()}
+            placeholder="Type a note..."
+            className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+            autoFocus
+          />
+          <button
+            onClick={submitNote}
+            className="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-semibold"
+          >
+            Add
+          </button>
+        </div>
+      )}
+
+      {/* Recap overlay */}
+      {showRecap && (
+        <div className="fixed inset-0 z-50 bg-gray-950 overflow-y-auto flex flex-col items-center py-12 px-6">
+
+          <div style={{ width: '100%', maxWidth: '600px' }}>
+          <div
+            ref={recapRef}
+            style={{
+              backgroundColor: '#111827',
+              borderRadius: '16px',
+              padding: '32px',
+              width: '100%',
+              maxWidth: '600px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              fontFamily: 'sans-serif',
+            }}
+          >
+            {/* Header */}
+            <div style={{ textAlign: 'center' }}>
+              <h1 style={{ color: '#E8500A', fontSize: '28px', fontWeight: 'bold', margin: 0 }}>
+                Dles Night
+              </h1>
+              <p style={{ color: '#9ca3af', fontSize: '13px', marginTop: '4px' }}>
+                {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+
+            {/* Win rates */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {[
+                {
+                  label: 'Tonight',
+                  score: `${sessionResults.filter(r => r.result === 'win').length}/${sessionResults.length}`,
+                  pct: sessionResults.length > 0
+                    ? Math.round((sessionResults.filter(r => r.result === 'win').length / sessionResults.length) * 100)
+                    : 0
+                },
+                {
+                  label: 'All Time',
+                  score: winRate ? `${winRate.total_won}/${winRate.total_played}` : '—',
+                  pct: winRate?.total_played > 0
+                    ? Math.round((winRate.total_won / winRate.total_played) * 100)
+                    : 0
+                }
+              ].map(stat => (
+                <div key={stat.label} style={{
+                  backgroundColor: '#1f2937',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ color: '#6b7280', fontSize: '11px', margin: '0 0 4px' }}>{stat.label}</p>
+                  <p style={{ color: '#ffffff', fontSize: '28px', fontWeight: 'bold', margin: 0 }}>{stat.score}</p>
+                  <p style={{ color: '#E8500A', fontSize: '13px', fontWeight: '600', margin: '2px 0 0' }}>{stat.pct}%</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Dle results */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                Tonight's Games
+              </p>
+              {sessionResults.map((r, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: '#1f2937',
+                  borderRadius: '8px',
+                  padding: '8px 16px'
+                }}>
+                  <span style={{ color: '#e5e7eb', fontSize: '14px' }}>{r.name}</span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    backgroundColor: r.result === 'win' ? '#14532d' : '#7f1d1d',
+                    color: r.result === 'win' ? '#4ade80' : '#f87171'
+                  }}>
+                    {r.result === 'win' ? '✓ Win' : '✗ Fail'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Session notes log */}
+            {sessionNotes.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p style={{
+                  color: '#6b7280', fontSize: '11px',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0
+                }}>
+                  Notes from Tonight
+                </p>
+                {sessionNotes.map((note, i) => (
+                  <div key={note.id || i} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    backgroundColor: '#1f2937',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    borderLeft: `3px solid ${note.colour}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: note.colour, fontSize: '11px', fontWeight: '600' }}>
+                        {note.username}
+                      </span>
+                      <span style={{ color: '#4b5563', fontSize: '10px' }}>
+                        {note.dleName}
+                      </span>
+                    </div>
+                    <p style={{ color: '#d1d5db', fontSize: '13px', margin: 0 }}>
+                      {note.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer */}
+            <p style={{ textAlign: 'center', fontSize: '11px', color: '#374151', margin: 0 }}>
+              Dles Night — powered by chaos
+            </p>
+          </div>
+          </div>
+
+          <div className="flex gap-4 mt-6">
+            <button
+              onClick={copyResult}
+              className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold"
+            >
+              {copied ? '✓ Copied!' : '📋 Copy Result'}
+            </button>
+            <button
+              onClick={() => setShowRecap(false)}
+              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl"
+            >
+              Back to Session
+            </button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+export default App
