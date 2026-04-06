@@ -226,12 +226,15 @@ function App() {
       const el = dlePanelRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      window.api.dleView.setBounds({
+      const bounds = {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
         width: Math.round(rect.width),
         height: Math.round(rect.height),
-      })
+      }
+      console.log('[DEBUG] dlePanelRef.getBoundingClientRect():', rect.x, rect.y, rect.width, rect.height)
+      console.log('[DEBUG] sending dle-view:set-bounds:', bounds)
+      window.api.dleView.setBounds(bounds)
     }
 
     const timer = setTimeout(updateBounds, 100)
