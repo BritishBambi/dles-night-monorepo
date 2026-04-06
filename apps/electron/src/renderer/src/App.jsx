@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase } from '@dles-night/shared'
+import TitleBar from './components/TitleBar'
 
 const SESSION_ID = 'nightsession'
 
@@ -386,22 +387,19 @@ function App() {
 
     const canvas = canvasRef.current
 
-    // Size the canvas to the full viewport explicitly
+    const TITLEBAR_HEIGHT = 32
     canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    canvas.height = window.innerHeight - TITLEBAR_HEIGHT
 
-    // Init the shared canvas after sizing
     const userId = rtcRef.current?.viewerId || crypto.randomUUID()
     const sc = new SharedCanvas(canvas, userId)
     sharedCanvasRef.current = sc
     sc.connect().then(() => sc.attachListeners())
 
-    // Handle resize without clearing canvas content
     const handleResize = () => {
-      // Save current drawing
       const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
       canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      canvas.height = window.innerHeight - TITLEBAR_HEIGHT
       canvas.getContext('2d').putImageData(imageData, 0, 0)
     }
 
@@ -599,10 +597,13 @@ powered by Jojo labs`
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-950 text-white">
 
+      <TitleBar />
+
       <canvas
         ref={canvasRef}
         className="fixed inset-0 z-10"
         style={{
+          top: 32,
           cursor: drawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : 'default',
           pointerEvents: drawMode ? 'auto' : 'none'
         }}
@@ -845,7 +846,7 @@ powered by Jojo labs`
       </div>
 
       {/* Sticky notes overlay */}
-      <div className="fixed inset-0 z-30 pointer-events-none">
+      <div className="fixed inset-0 z-30 pointer-events-none" style={{ top: 32 }}>
         {Object.values(notes).map(note => (
           <StickyNote
             key={note.id}

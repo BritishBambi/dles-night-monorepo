@@ -2,7 +2,6 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 // Custom APIs for renderer
 const api = {
-  // Dle WebContentsView controls
   dleView: {
     create: () => ipcRenderer.invoke('dle-view:create'),
     setBounds: (bounds) => ipcRenderer.invoke('dle-view:set-bounds', bounds),
@@ -10,7 +9,12 @@ const api = {
     hide: () => ipcRenderer.invoke('dle-view:hide'),
     show: () => ipcRenderer.invoke('dle-view:show'),
     destroy: () => ipcRenderer.invoke('dle-view:destroy'),
-  }
+  },
+  window: {
+    minimize: () => ipcRenderer.send('window-minimize'),
+    maximize: () => ipcRenderer.send('window-maximize'),
+    close: () => ipcRenderer.send('window-close'),
+  },
 }
 
 if (process.contextIsolated) {

@@ -12,6 +12,8 @@ function createWindow() {
     height: 900,
     title: 'Dles Night',
     show: false,
+    frame: false,
+    transparent: true,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -198,6 +200,12 @@ app.whenReady().then(() => {
     }
     return { success: true }
   })
+
+  ipcMain.on('window-minimize', () => mainWindow.minimize())
+  ipcMain.on('window-maximize', () => {
+    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
+  })
+  ipcMain.on('window-close', () => mainWindow.close())
 
   ipcMain.on('ping', () => console.log('pong'))
 
