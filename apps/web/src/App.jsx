@@ -76,6 +76,7 @@ function StickyNote({ note, onMove, onDelete }) {
 
 function App() {
   const [mode, setMode] = useState(null) // null | 'host' | 'viewer'
+  const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [streaming, setStreaming] = useState(false)
   const [streamEnded, setStreamEnded] = useState(false)
@@ -177,6 +178,7 @@ function App() {
   useEffect(() => {
     if (videoRef.current && viewerStream) {
       videoRef.current.srcObject = viewerStream
+      videoRef.current.volume = streamVolume
     }
   }, [viewerStream])
 
@@ -627,7 +629,7 @@ powered by Jojo labs`
                     Waiting for Julie to start streaming...
                   </div>
                 )}
-                <div className="absolute bottom-0 left-0 right-0 flex justify-center py-2 bg-gray-950">
+                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gray-950">
                   <button
                     onClick={async () => {
                       setViewerStream(null)
@@ -637,6 +639,23 @@ powered by Jojo labs`
                   >
                     ↺ Reconnect Stream
                   </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-xs select-none">🔊</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={streamVolume}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value)
+                        setStreamVolume(v)
+                        localStorage.setItem('streamVolume', v)
+                        if (videoRef.current) videoRef.current.volume = v
+                      }}
+                      style={{ accentColor: '#E8500A', width: '100px' }}
+                    />
+                  </div>
                 </div>
               </>
             )}
