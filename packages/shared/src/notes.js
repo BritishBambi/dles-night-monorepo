@@ -6,6 +6,22 @@ export class StickyNotes {
     this.onUpdate = onUpdate
     this.channel = null
     this.notes = {}
+    this._getRect = null
+  }
+
+  // Set a reference frame for coordinate normalization/denormalization.
+  // getRect() must return { x, y, width, height } in viewport-absolute pixels.
+  // If not set, falls back to { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }.
+  setReferenceFrame(getRect) {
+    this._getRect = getRect
+  }
+
+  _ref() {
+    if (this._getRect) {
+      const rect = this._getRect()
+      if (rect) return rect
+    }
+    return { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
   }
 
   async connect() {
@@ -15,18 +31,18 @@ export class StickyNotes {
 
     this.channel.on('broadcast', { event: 'note-add' }, ({ payload }) => {
       const note = payload.note
-      // Denormalize coordinates when storing
-      note.x = note.x * window.innerWidth
-      note.y = note.y * window.innerHeight
+      const ref = this._ref()
+      note.x = note.x * ref.width + ref.x
+      note.y = note.y * ref.height + ref.y
       this.notes[note.id] = note
       this.onUpdate({ ...this.notes })
     })
 
     this.channel.on('broadcast', { event: 'note-move' }, ({ payload }) => {
       if (this.notes[payload.id]) {
-        // Denormalize coordinates when storing
-        this.notes[payload.id].x = payload.x * window.innerWidth
-        this.notes[payload.id].y = payload.y * window.innerHeight
+        const ref = this._ref()
+        this.notes[payload.id].x = payload.x * ref.width + ref.x
+        this.notes[payload.id].y = payload.y * ref.height + ref.y
         this.onUpdate({ ...this.notes })
       }
     })
@@ -43,13 +59,13 @@ export class StickyNotes {
 
     this.channel.on('broadcast', { event: 'notes-request' }, () => {
       if (Object.keys(this.notes).length === 0) return
-      // Normalize coordinates before sending in sync
+      const ref = this._ref()
       const normalizedNotes = {}
       for (const [id, note] of Object.entries(this.notes)) {
         normalizedNotes[id] = {
           ...note,
-          x: note.x / window.innerWidth,
-          y: note.y / window.innerHeight
+          x: (note.x - ref.x) / ref.width,
+          y: (note.y - ref.y) / ref.height
         }
       }
       this.channel.send({
@@ -60,13 +76,13 @@ export class StickyNotes {
     })
 
     this.channel.on('broadcast', { event: 'notes-sync' }, ({ payload }) => {
-      // Merge incoming notes with any we already have, denormalizing coordinates
+      const ref = this._ref()
       const denormalizedNotes = {}
       for (const [id, note] of Object.entries(payload.notes)) {
         denormalizedNotes[id] = {
           ...note,
-          x: note.x * window.innerWidth,
-          y: note.y * window.innerHeight
+          x: note.x * ref.width + ref.x,
+          y: note.y * ref.height + ref.y
         }
       }
       this.notes = { ...denormalizedNotes, ...this.notes }
@@ -110,11 +126,11 @@ export class StickyNotes {
 
   moveNote(id, x, y) {
     if (this.notes[id]) {
-      // Normalize coordinates before storing and broadcasting
-      const normalizedX = x / window.innerWidth
-      const normalizedY = y / window.innerHeight
-      this.notes[id].x = normalizedX
-      this.notes[id].y = normalizedY
+      const ref = this._ref()
+      const normalizedX = (x - ref.x) / ref.width
+      const normalizedY = (y - ref.y) / ref.height
+      this.notes[id].x = normalizedX * ref.width + ref.x
+      this.notes[id].y = normalizedY * ref.height + ref.y
       this.channel.send({
         type: 'broadcast',
         event: 'note-move',

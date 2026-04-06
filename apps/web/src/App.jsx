@@ -354,6 +354,24 @@ function App() {
         }))]
       })
     })
+
+    // In viewer mode, align note coordinates to the actual video content area
+    if (mode === 'viewer') {
+      sn.setReferenceFrame(() => {
+        const video = videoRef.current
+        const panel = panelRef.current
+        if (!video || !panel || !video.videoWidth) return null
+        const contentRect = getVideoContentRect(video, panel)
+        const panelRect = panel.getBoundingClientRect()
+        return {
+          x: panelRect.x + contentRect.x,
+          y: panelRect.y + contentRect.y,
+          width: contentRect.width,
+          height: contentRect.height,
+        }
+      })
+    }
+
     notesRef.current = sn
     sn.connect()
     return () => sn.disconnect()
