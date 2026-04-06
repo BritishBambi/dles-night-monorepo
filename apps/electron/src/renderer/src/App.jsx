@@ -3,6 +3,8 @@ import { DlesRTC, SessionChat, SessionSync, StickyNotes, supabase, DLES } from '
 import TitleBar from './components/TitleBar'
 import logo from './assets/logo.png'
 
+const SESSION_ID = 'nightsession'
+
 function StickyNote({ note, onMove, onDelete }) {
   const ref = useRef(null)
   const dragging = useRef(false)
