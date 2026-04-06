@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase } from '@dles-night/shared'
+import { DlesRTC, SessionChat, SessionSync, StickyNotes, supabase } from '@dles-night/shared'
 import TitleBar from './components/TitleBar'
 
 const SESSION_ID = 'nightsession'
@@ -82,9 +82,6 @@ function App() {
   const [streaming, setStreaming] = useState(false)
   const [streamEnded, setStreamEnded] = useState(false)
   const [viewerStream, setViewerStream] = useState(null)
-  const [activeTool, setActiveTool] = useState('pen')
-  const [activeColour, setActiveColour] = useState('#E8500A')
-  const [drawMode, setDrawMode] = useState(false)
   const [messages, setMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [username, setUsername] = useState('')
@@ -102,12 +99,10 @@ function App() {
   const [copied, setCopied] = useState(false)
   const rtcRef = useRef(null)
   const videoRef = useRef(null)
-  const canvasRef = useRef(null)
   const dlePanelRef = useRef(null)
 
   // Check if we're in Electron (WebContentsView available)
   const isElectron = typeof window !== 'undefined' && !!window.api?.dleView
-  const sharedCanvasRef = useRef(null)
   const chatRef = useRef(null)
   const messagesEndRef = useRef(null)
   const notesRef = useRef(null)
@@ -115,7 +110,6 @@ function App() {
   const sessionSyncRef = useRef(null)
   const currentIndexRef = useRef(currentIndex)
   const usernameColourPickerRef = useRef(null)
-  const toolbarColourPickerRef = useRef(null)
   const [toolbarPos, setToolbarPos] = useState({ x: 16, y: 80 })
   const toolbarDragging = useRef(false)
   const toolbarOffset = useRef({ x: 0, y: 0 })
@@ -126,7 +120,6 @@ function App() {
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1)
-      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
       if (notesRef.current) notesRef.current.clearAll()
     }
   }
@@ -134,7 +127,6 @@ function App() {
   const handleNext = () => {
     if (currentIndex < DLES.length - 1) {
       setCurrentIndex(prev => prev + 1)
-      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
       if (notesRef.current) notesRef.current.clearAll()
     }
   }
@@ -226,15 +218,12 @@ function App() {
       const el = dlePanelRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const bounds = {
+      window.api.dleView.setBounds({
         x: Math.round(rect.x),
         y: Math.round(rect.y),
         width: Math.round(rect.width),
         height: Math.round(rect.height),
-      }
-      console.log('[DEBUG] dlePanelRef.getBoundingClientRect():', rect.x, rect.y, rect.width, rect.height)
-      console.log('[DEBUG] sending dle-view:set-bounds:', bounds)
-      window.api.dleView.setBounds(bounds)
+      })
     }
 
     const timer = setTimeout(updateBounds, 100)
@@ -341,7 +330,6 @@ function App() {
     if (currentIndex < DLES.length - 1) {
       const nextIndex = currentIndex + 1
       setCurrentIndex(nextIndex)
-      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
       if (notesRef.current) notesRef.current.clearAll()
       sessionSyncRef.current?.broadcastResult(entry, nextIndex, newResults, updatedWinRate)
       sessionSyncRef.current?.broadcastAdvance(nextIndex)
@@ -384,35 +372,6 @@ function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  useEffect(() => {
-    if (!mode || !canvasRef.current) return
-
-    const canvas = canvasRef.current
-
-    const TITLEBAR_HEIGHT = 32
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight - TITLEBAR_HEIGHT
-
-    const userId = rtcRef.current?.viewerId || crypto.randomUUID()
-    const sc = new SharedCanvas(canvas, userId)
-    sharedCanvasRef.current = sc
-    sc.connect().then(() => sc.attachListeners())
-
-    const handleResize = () => {
-      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight - TITLEBAR_HEIGHT
-      canvas.getContext('2d').putImageData(imageData, 0, 0)
-    }
-
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      sc.disconnect()
-    }
-  }, [mode])
 
   const handleEndSession = async () => {
     // Hide the WebContentsView so the recap screen is visible
@@ -601,16 +560,6 @@ powered by Jojo labs`
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-950 text-white">
 
       <TitleBar />
-
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 z-10"
-        style={{
-          top: 32,
-          cursor: drawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : 'default',
-          pointerEvents: drawMode ? 'auto' : 'none'
-        }}
-      />
 
       {/* Top bar */}
       <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
@@ -861,33 +810,6 @@ powered by Jojo labs`
           <div className="w-4 h-0.5 bg-gray-400 rounded" />
         </div>
 
-        {/* Draw toggle */}
-        <button
-          onClick={() => setDrawMode(prev => !prev)}
-          className={`w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-colors ${drawMode ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
-          title={drawMode ? 'Drawing on' : 'Drawing off'}
-        >
-          ✏️
-        </button>
-
-        {/* Pen */}
-        <button
-          onClick={() => { setActiveTool('pen'); sharedCanvasRef.current?.setTool('pen') }}
-          className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${activeTool === 'pen' && drawMode ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
-          title="Pen"
-        >
-          🖊
-        </button>
-
-        {/* Eraser */}
-        <button
-          onClick={() => { setActiveTool('eraser'); sharedCanvasRef.current?.setTool('eraser') }}
-          className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${activeTool === 'eraser' && drawMode ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
-          title="Eraser"
-        >
-          🧹
-        </button>
-
         {/* Note */}
         <button
           onClick={() => setShowNoteInput(prev => !prev)}
@@ -895,63 +817,6 @@ powered by Jojo labs`
           title="Add note"
         >
           📝
-        </button>
-
-        {/* Divider */}
-        <div className="w-4 h-px bg-gray-700 my-1" />
-
-        {/* Rainbow colour picker */}
-        <input
-          type="color"
-          ref={toolbarColourPickerRef}
-          value={activeColour}
-          onChange={e => {
-            setActiveColour(e.target.value)
-            sharedCanvasRef.current?.setColour(e.target.value)
-          }}
-          className="sr-only"
-        />
-        <button
-          onClick={() => toolbarColourPickerRef.current.click()}
-          className="relative w-8 h-8 rounded-full hover:scale-110 transition-transform"
-          style={{
-            background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
-            padding: '2px'
-          }}
-          title="Pick colour"
-        >
-          <span
-            className="block w-full h-full rounded-full"
-            style={{ backgroundColor: activeColour }}
-          />
-        </button>
-
-        {/* Quick presets — vertical */}
-        {['#E8500A','#ffffff','#facc15','#4ade80','#60a5fa','#f472b6','#ef4444','#a855f7'].map(c => (
-          <button
-            key={c}
-            onClick={() => {
-              setActiveColour(c)
-              sharedCanvasRef.current?.setColour(c)
-            }}
-            className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 flex-shrink-0"
-            style={{
-              backgroundColor: c,
-              borderColor: activeColour === c ? 'white' : 'transparent'
-            }}
-          />
-        ))}
-
-        {/* Divider */}
-        <div className="w-4 h-px bg-gray-700 my-1" />
-
-        {/* Clear */}
-        <button
-          onClick={() => sharedCanvasRef.current?.broadcastClear()}
-          className="w-8 h-8 rounded-lg text-sm bg-gray-700 hover:bg-red-900 text-gray-300 hover:text-white transition-colors"
-          title="Clear canvas"
-        >
-          🗑
         </button>
       </div>
 

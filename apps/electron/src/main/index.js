@@ -208,16 +208,12 @@ app.whenReady().then(() => {
 
     if (overlayWindow && !overlayWindow.isDestroyed() && mainWindow) {
       const parentBounds = mainWindow.getBounds()
-      const overlayBounds = {
+      overlayWindow.setBounds({
         x: Math.round(parentBounds.x + bounds.x),
         y: Math.round(parentBounds.y + bounds.y),
         width: Math.round(bounds.width),
         height: Math.round(bounds.height),
-      }
-      console.log('[DEBUG] mainWindow.getBounds():', parentBounds)
-      console.log('[DEBUG] panel rect from renderer:', bounds)
-      console.log('[DEBUG] overlayWindow.setBounds():', overlayBounds)
-      overlayWindow.setBounds(overlayBounds)
+      })
       if (!overlayWindow.isVisible()) overlayWindow.show()
     }
 
