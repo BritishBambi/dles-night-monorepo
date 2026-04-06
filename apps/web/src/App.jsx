@@ -325,9 +325,11 @@ function App() {
 
     const canvas = canvasRef.current
 
-    // Size the canvas to the full viewport explicitly
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    // Size the canvas to the drawable area (excluding header and chat sidebar)
+    const HEADER_HEIGHT = 48
+    const CHAT_SIDEBAR_WIDTH = 320
+    canvas.width = window.innerWidth - CHAT_SIDEBAR_WIDTH
+    canvas.height = window.innerHeight - HEADER_HEIGHT
 
     // Init the shared canvas after sizing
     const userId = rtcRef.current?.viewerId || crypto.randomUUID()
@@ -339,8 +341,8 @@ function App() {
     const handleResize = () => {
       // Save current drawing
       const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      canvas.width = window.innerWidth - CHAT_SIDEBAR_WIDTH
+      canvas.height = window.innerHeight - HEADER_HEIGHT
       canvas.getContext('2d').putImageData(imageData, 0, 0)
     }
 
@@ -535,8 +537,12 @@ powered by Jojo labs`
 
       <canvas
         ref={canvasRef}
-        className="fixed inset-0 z-10"
+        className="fixed z-10"
         style={{
+          top: 48,
+          left: 0,
+          right: 320,
+          bottom: 0,
           cursor: drawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : 'default',
           pointerEvents: drawMode ? 'auto' : 'none'
         }}
