@@ -5,6 +5,9 @@ const icon = join(__dirname, '../../resources/icon.png')
 
 let mainWindow = null
 let dleView = null
+let overlayWindow = null
+// Last known game panel rect (viewport coords) — used to reposition overlay on parent move/resize
+let lastPanelRect = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -40,6 +43,17 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+function syncOverlayBounds() {
+  if (!overlayWindow || !mainWindow || !lastPanelRect || overlayWindow.isDestroyed()) return
+  const parentBounds = mainWindow.getBounds()
+  overlayWindow.setBounds({
+    x: Math.round(parentBounds.x + lastPanelRect.x),
+    y: Math.round(parentBounds.y + lastPanelRect.y),
+    width: Math.round(lastPanelRect.width),
+    height: Math.round(lastPanelRect.height),
+  })
 }
 
 app.whenReady().then(() => {
@@ -142,11 +156,47 @@ app.whenReady().then(() => {
       return { action: 'deny' }
     })
 
+    // Create transparent child BrowserWindow for canvas/notes overlay.
+    // setIgnoreMouseEvents passes all input through to mainWindow below it in z-order.
+    overlayWindow = new BrowserWindow({
+      parent: mainWindow,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      focusable: false,
+      hasShadow: false,
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+      }
+    })
+
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true })
+
+    const overlayUrl = !app.isPackaged && process.env['ELECTRON_RENDERER_URL']
+      ? process.env['ELECTRON_RENDERER_URL'] + '/overlay/index.html'
+      : 'file://' + join(__dirname, '../renderer/overlay/index.html')
+
+    try {
+      await overlayWindow.loadURL(overlayUrl)
+    } catch (err) {
+      console.warn('overlay load warning:', err.message)
+    }
+
+    // Reposition overlay whenever mainWindow is moved or resized
+    mainWindow.on('move', syncOverlayBounds)
+    mainWindow.on('resize', syncOverlayBounds)
+
     return { success: true }
   })
 
-  // Update the bounds of the WebContentsView
+  // Update dleView bounds (viewport coords) and reposition overlayWindow (screen coords)
   ipcMain.handle('dle-view:set-bounds', async (event, bounds) => {
+    lastPanelRect = bounds
+
     if (dleView) {
       dleView.setBounds({
         x: Math.round(bounds.x),
@@ -155,6 +205,18 @@ app.whenReady().then(() => {
         height: Math.round(bounds.height),
       })
     }
+
+    if (overlayWindow && !overlayWindow.isDestroyed() && mainWindow) {
+      const parentBounds = mainWindow.getBounds()
+      overlayWindow.setBounds({
+        x: Math.round(parentBounds.x + bounds.x),
+        y: Math.round(parentBounds.y + bounds.y),
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+      })
+      if (!overlayWindow.isVisible()) overlayWindow.show()
+    }
+
     return { success: true }
   })
 
@@ -173,31 +235,34 @@ app.whenReady().then(() => {
     return { success: false, error: 'No dle view' }
   })
 
-  // Hide the WebContentsView
+  // Hide the WebContentsView and overlay
   ipcMain.handle('dle-view:hide', async () => {
-    if (dleView && mainWindow) {
-      mainWindow.contentView.removeChildView(dleView)
-    }
+    if (dleView && mainWindow) mainWindow.contentView.removeChildView(dleView)
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide()
     return { success: true }
   })
 
-  // Show the WebContentsView again
+  // Show the WebContentsView and overlay
   ipcMain.handle('dle-view:show', async () => {
-    if (dleView && mainWindow) {
-      mainWindow.contentView.addChildView(dleView)
-    }
+    if (dleView && mainWindow) mainWindow.contentView.addChildView(dleView)
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.show()
     return { success: true }
   })
 
-  // Destroy the WebContentsView
+  // Destroy the WebContentsView and overlay
   ipcMain.handle('dle-view:destroy', async () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      mainWindow.off('move', syncOverlayBounds)
+      mainWindow.off('resize', syncOverlayBounds)
+      overlayWindow.destroy()
+      overlayWindow = null
+    }
     if (dleView) {
-      if (mainWindow) {
-        mainWindow.contentView.removeChildView(dleView)
-      }
+      if (mainWindow) mainWindow.contentView.removeChildView(dleView)
       dleView.webContents.close()
       dleView = null
     }
+    lastPanelRect = null
     return { success: true }
   })
 

@@ -845,18 +845,6 @@ powered by Jojo labs`
 
       </div>
 
-      {/* Sticky notes overlay */}
-      <div className="fixed inset-0 z-30 pointer-events-none" style={{ top: 32 }}>
-        {Object.values(notes).map(note => (
-          <StickyNote
-            key={note.id}
-            note={note}
-            onMove={(id, x, y) => notesRef.current?.moveNote(id, x, y)}
-            onDelete={(id) => notesRef.current?.deleteNote(id)}
-          />
-        ))}
-      </div>
-
       {/* Draggable vertical toolbar */}
       <div
         onMouseDown={onToolbarMouseDown}
