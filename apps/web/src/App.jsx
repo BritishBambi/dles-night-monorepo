@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase, DLES } from '@dles-night/shared'
 
+const SESSION_ID = 'nightsession'
+
 function StickyNote({ note, onMove, onDelete }) {
   const ref = useRef(null)
   const dragging = useRef(false)
