@@ -45,7 +45,10 @@ jobs:
 
       - name: Build electron-vite bundles
         working-directory: apps/electron
-        run: npm run build
+        run: |
+          npm run build
+          ls -la out/
+          ls -la out/main/
 
       - name: Package Windows installer
         working-directory: apps/electron
