@@ -4,6 +4,7 @@ directories:
   buildResources: build
   output: dist-installer
 files:
+  - 'out/**'
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
