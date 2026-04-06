@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "main": "src/index.js",
+  "scripts": {
+    "build": "echo 'Shared package - no build needed'"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0"
   }

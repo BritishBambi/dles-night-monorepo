@@ -1,26 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase } from '@dles-night/shared'
-
-const SESSION_ID = 'nightsession'
-
-const DLES = [
-  { name: 'Poople', url: 'https://poople.io' },
-  { name: 'Heardle 2020s', url: 'https://20s.heardledecades.com' },
-  { name: 'Heardle 2010s', url: 'https://heardle10s.com' },
-  { name: 'Heardle 2000s', url: 'https://00s.heardledecades.com' },
-  { name: 'Heardle 1990s', url: 'https://90s.heardledecades.com' },
-  { name: 'Heardle 1980s', url: 'https://80s.heardledecades.com' },
-  { name: 'Heardle TV Themes', url: 'https://tv.heardledecades.xyz' },
-  { name: 'Bandle', url: 'https://bandle.app' },
-  { name: 'Crosstune', url: 'https://crosstune.io' },
-  { name: 'Scrandle', url: 'https://scrandle.com' },
-  { name: 'LinkedIn Pinpoint', url: 'https://www.linkedin.com/games/pinpoint' },
-  { name: 'Adoptle', url: 'https://tryhardguides.com/adoptle' },
-  { name: 'Movie Grid', url: 'https://moviegrid.io' },
-  { name: 'Cine2Nerdle', url: 'https://www.cinenerdle2.app' },
-  { name: 'Redactle', url: 'https://redactle.net' },
-  { name: 'Contexto', url: 'https://contexto.me' },
-]
+import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase, DLES } from '@dles-night/shared'
 
 function StickyNote({ note, onMove, onDelete }) {
   const ref = useRef(null)
