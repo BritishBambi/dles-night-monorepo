@@ -28,6 +28,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install electron app dependencies
+        working-directory: apps/electron
+        run: npm install
+
       - name: Update version in package.json
         working-directory: apps/electron
         run: |
