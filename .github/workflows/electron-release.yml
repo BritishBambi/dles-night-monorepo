@@ -36,4 +36,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/electron/dist-installer/DlesNight-Setup-*.exe
+          files: |
+            apps/electron/dist-installer/DlesNight-Setup-*.exe
+            apps/electron/dist-installer/latest.yml

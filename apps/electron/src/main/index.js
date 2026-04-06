@@ -1,5 +1,6 @@
-const { app, shell, BrowserWindow, ipcMain, session, WebContentsView } = require('electron')
+const { app, shell, BrowserWindow, dialog, ipcMain, session, WebContentsView } = require('electron')
 const { join } = require('path')
+const { autoUpdater } = require('electron-updater')
 const icon = join(__dirname, '../../resources/icon.png')
 
 let mainWindow = null
@@ -201,6 +202,31 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   createWindow()
+
+  // Auto-update
+  autoUpdater.checkForUpdatesAndNotify()
+
+  autoUpdater.on('update-available', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update available',
+      message: 'A new version of Dles Night is available and is being downloaded.',
+    })
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      title: 'Update ready',
+      message: 'An update has been downloaded. Restart now to install it?',
+      buttons: ['Yes', 'No'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall()
+      }
+    })
+  })
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
