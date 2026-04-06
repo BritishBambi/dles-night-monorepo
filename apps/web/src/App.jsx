@@ -640,7 +640,7 @@ powered by Jojo labs`
                     ↺ Reconnect Stream
                   </button>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-xs select-none">🔊</span>
+                    <span className="text-gray-400 text-xs select-none">{streamVolume === 0 ? '🔇' : '🔊'}</span>
                     <input
                       type="range"
                       min={0}
@@ -653,7 +653,10 @@ powered by Jojo labs`
                         localStorage.setItem('streamVolume', v)
                         if (videoRef.current) videoRef.current.volume = v
                       }}
-                      style={{ accentColor: '#E8500A', width: '100px' }}
+                      className="volume-slider"
+                      style={{
+                        background: `linear-gradient(to right, #E8500A 0%, #E8500A ${streamVolume * 100}%, #374151 ${streamVolume * 100}%, #374151 100%)`
+                      }}
                     />
                   </div>
                 </div>
