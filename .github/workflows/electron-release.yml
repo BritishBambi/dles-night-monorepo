@@ -1,0 +1,39 @@
+name: Electron Windows Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/electron/**'
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build electron-vite bundles
+        run: npm run build --workspace=apps/electron
+
+      - name: Package Windows installer
+        working-directory: apps/electron
+        run: npx electron-builder --win --publish never
+
+      - name: Upload installer as release artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/electron/dist-installer/*.exe
