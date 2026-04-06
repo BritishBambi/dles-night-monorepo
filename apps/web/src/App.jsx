@@ -74,6 +74,30 @@ function StickyNote({ note, onMove, onDelete }) {
   )
 }
 
+function getVideoContentRect(videoEl, panelEl) {
+  const panelRect = panelEl.getBoundingClientRect()
+  if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) {
+    return { x: 0, y: 0, width: panelRect.width, height: panelRect.height }
+  }
+  const videoRatio = videoEl.videoWidth / videoEl.videoHeight
+  const panelRatio = panelRect.width / panelRect.height
+  let contentWidth, contentHeight, offsetX, offsetY
+  if (videoRatio > panelRatio) {
+    // Video wider than panel — letterbox top/bottom
+    contentWidth = panelRect.width
+    contentHeight = panelRect.width / videoRatio
+    offsetX = 0
+    offsetY = (panelRect.height - contentHeight) / 2
+  } else {
+    // Video taller than panel — letterbox left/right
+    contentHeight = panelRect.height
+    contentWidth = panelRect.height * videoRatio
+    offsetX = (panelRect.width - contentWidth) / 2
+    offsetY = 0
+  }
+  return { x: offsetX, y: offsetY, width: contentWidth, height: contentHeight }
+}
+
 function App() {
   const [mode, setMode] = useState(null) // null | 'host' | 'viewer'
   const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
@@ -102,6 +126,7 @@ function App() {
   const rtcRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+  const panelRef = useRef(null)
   const sharedCanvasRef = useRef(null)
   const chatRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -181,6 +206,34 @@ function App() {
     if (videoRef.current && viewerStream) {
       videoRef.current.srcObject = viewerStream
       videoRef.current.volume = streamVolume
+    }
+  }, [viewerStream])
+
+  // Resize canvas to match actual video content area when stream connects or video dimensions change
+  useEffect(() => {
+    if (!viewerStream || !videoRef.current || !canvasRef.current || !panelRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const panel = panelRef.current
+
+    const sizeToVideo = () => {
+      if (!video.videoWidth) return
+      const rect = getVideoContentRect(video, panel)
+      canvas.width = Math.round(rect.width)
+      canvas.height = Math.round(rect.height)
+      canvas.style.left = Math.round(rect.x) + 'px'
+      canvas.style.top = Math.round(rect.y) + 'px'
+      canvas.style.width = Math.round(rect.width) + 'px'
+      canvas.style.height = Math.round(rect.height) + 'px'
+    }
+
+    video.addEventListener('loadedmetadata', sizeToVideo)
+    video.addEventListener('resize', sizeToVideo)
+    if (video.videoWidth) sizeToVideo()
+
+    return () => {
+      video.removeEventListener('loadedmetadata', sizeToVideo)
+      video.removeEventListener('resize', sizeToVideo)
     }
   }, [viewerStream])
 
@@ -321,29 +374,40 @@ function App() {
   }, [messages])
 
   useEffect(() => {
-    if (!mode || !canvasRef.current) return
+    if (!mode || !canvasRef.current || !panelRef.current) return
 
     const canvas = canvasRef.current
+    const panel = panelRef.current
 
-    // Size the canvas to the drawable area (excluding header and chat sidebar)
-    const HEADER_HEIGHT = 48
-    const CHAT_SIDEBAR_WIDTH = 320
-    canvas.width = window.innerWidth - CHAT_SIDEBAR_WIDTH
-    canvas.height = window.innerHeight - HEADER_HEIGHT
+    // Size canvas to full panel initially (video content rect applied later when stream loads)
+    const panelRect = panel.getBoundingClientRect()
+    canvas.width = Math.round(panelRect.width)
+    canvas.height = Math.round(panelRect.height)
+    canvas.style.left = '0px'
+    canvas.style.top = '0px'
 
-    // Init the shared canvas after sizing
     const userId = rtcRef.current?.viewerId || crypto.randomUUID()
     const sc = new SharedCanvas(canvas, userId)
     sharedCanvasRef.current = sc
     sc.connect().then(() => sc.attachListeners())
 
-    // Handle resize without clearing canvas content
     const handleResize = () => {
-      // Save current drawing
-      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
-      canvas.width = window.innerWidth - CHAT_SIDEBAR_WIDTH
-      canvas.height = window.innerHeight - HEADER_HEIGHT
-      canvas.getContext('2d').putImageData(imageData, 0, 0)
+      const video = videoRef.current
+      let x = 0, y = 0, w, h
+      if (mode === 'viewer' && video && video.videoWidth) {
+        const rect = getVideoContentRect(video, panel)
+        x = Math.round(rect.x); y = Math.round(rect.y)
+        w = Math.round(rect.width); h = Math.round(rect.height)
+      } else {
+        const r = panel.getBoundingClientRect()
+        w = Math.round(r.width); h = Math.round(r.height)
+      }
+      canvas.style.left = x + 'px'
+      canvas.style.top = y + 'px'
+      canvas.style.width = w + 'px'
+      canvas.style.height = h + 'px'
+      canvas.width = w
+      canvas.height = h
     }
 
     window.addEventListener('resize', handleResize)
@@ -535,19 +599,6 @@ powered by Jojo labs`
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-950 text-white">
 
-      <canvas
-        ref={canvasRef}
-        className="fixed z-10"
-        style={{
-          top: 48,
-          left: 0,
-          right: 320,
-          bottom: 0,
-          cursor: drawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : 'default',
-          pointerEvents: drawMode ? 'auto' : 'none'
-        }}
-      />
-
       {/* Top bar */}
       <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
         <span className="text-lg font-bold" style={{ color: '#E8500A' }}>Dles Night</span>
@@ -579,7 +630,16 @@ powered by Jojo labs`
         <div className="flex flex-col flex-1 h-full border-r border-gray-800 min-h-0 overflow-hidden">
 
           {/* Panel area */}
-          <div className="relative flex-1 min-h-0">
+          <div ref={panelRef} className="relative flex-1 min-h-0">
+
+            <canvas
+              ref={canvasRef}
+              className="absolute z-10"
+              style={{
+                cursor: drawMode ? (activeTool === 'eraser' ? 'cell' : 'crosshair') : 'default',
+                pointerEvents: drawMode ? 'auto' : 'none'
+              }}
+            />
 
             {mode === 'host' ? (
               sessionComplete ? (
