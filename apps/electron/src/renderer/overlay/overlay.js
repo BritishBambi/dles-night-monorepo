@@ -32,7 +32,18 @@ function drawSegment(from, to, tool, colour, size) {
 
 function drawStroke(stroke) {
   for (let i = 1; i < stroke.path.length; i++) {
-    drawSegment(stroke.path[i - 1], stroke.path[i], stroke.tool, stroke.colour, stroke.size)
+    // Denormalize coordinates and lineWidth for local rendering
+    const from = {
+      x: stroke.path[i - 1].x * canvas.width,
+      y: stroke.path[i - 1].y * canvas.height
+    }
+    const to = {
+      x: stroke.path[i].x * canvas.width,
+      y: stroke.path[i].y * canvas.height
+    }
+    const denormalizedSize = stroke.size * canvas.width
+
+    drawSegment(from, to, stroke.tool, stroke.colour, denormalizedSize)
   }
 }
 
@@ -63,9 +74,12 @@ function addNoteEl(note) {
   if (noteEls[note.id]) return
   const el = document.createElement('div')
   const colour = safeColour(note.colour)
+  // Denormalize coordinates for display
+  const x = note.x * window.innerWidth
+  const y = note.y * window.innerHeight
   el.style.cssText = `
     position: absolute;
-    left: ${note.x}px; top: ${note.y}px;
+    left: ${x}px; top: ${y}px;
     width: 192px;
     background: #111827;
     border: 1px solid ${colour};
@@ -94,7 +108,13 @@ const notesChannel = supabase
   .on('broadcast', { event: 'note-add' }, ({ payload }) => addNoteEl(payload.note))
   .on('broadcast', { event: 'note-move' }, ({ payload }) => {
     const el = noteEls[payload.id]
-    if (el) { el.style.left = payload.x + 'px'; el.style.top = payload.y + 'px' }
+    if (el) {
+      // Denormalize coordinates for display
+      const x = payload.x * window.innerWidth
+      const y = payload.y * window.innerHeight
+      el.style.left = x + 'px'
+      el.style.top = y + 'px'
+    }
   })
   .on('broadcast', { event: 'note-delete' }, ({ payload }) => {
     const el = noteEls[payload.id]

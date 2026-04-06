@@ -69,11 +69,17 @@ export class SharedCanvas {
     if (!this.isDrawing || this.currentPath.length === 0) return
     this.isDrawing = false
 
+    // Normalize path coordinates and size before broadcasting
+    const normalizedPath = this.currentPath.map(p => ({
+      x: p.x / this.canvas.width,
+      y: p.y / this.canvas.height
+    }))
+
     const stroke = {
-      path: this.currentPath,
+      path: normalizedPath,
       tool: this.tool,
       colour: this.colour,
-      size: this.size,
+      size: this.size / this.canvas.width,
       userId: this.userId
     }
 
@@ -113,7 +119,18 @@ export class SharedCanvas {
 
   drawStroke(stroke) {
     for (let i = 1; i < stroke.path.length; i++) {
-      this._drawSegment(stroke.path[i - 1], stroke.path[i], stroke.tool, stroke.colour, stroke.size)
+      // Denormalize coordinates and lineWidth for local rendering
+      const from = {
+        x: stroke.path[i - 1].x * this.canvas.width,
+        y: stroke.path[i - 1].y * this.canvas.height
+      }
+      const to = {
+        x: stroke.path[i].x * this.canvas.width,
+        y: stroke.path[i].y * this.canvas.height
+      }
+      const denormalizedSize = stroke.size * this.canvas.width
+
+      this._drawSegment(from, to, stroke.tool, stroke.colour, denormalizedSize)
     }
   }
 
