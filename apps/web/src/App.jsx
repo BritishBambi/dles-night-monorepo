@@ -109,6 +109,8 @@ function App() {
   const recapRef = useRef(null)
   const sessionSyncRef = useRef(null)
   const currentIndexRef = useRef(currentIndex)
+  const usernameColourPickerRef = useRef(null)
+  const toolbarColourPickerRef = useRef(null)
   const [toolbarPos, setToolbarPos] = useState({ x: 16, y: 80 })
   const toolbarDragging = useRef(false)
   const toolbarOffset = useRef({ x: 0, y: 0 })
@@ -415,8 +417,8 @@ powered by Jojo labs`
     const onMouseMove = (e) => {
       if (!toolbarDragging.current) return
       setToolbarPos({
-        x: e.clientX - toolbarOffset.current.x,
-        y: e.clientY - toolbarOffset.current.y
+        x: Math.max(0, Math.min(e.clientX - toolbarOffset.current.x, window.innerWidth - 56)),
+        y: Math.max(0, Math.min(e.clientY - toolbarOffset.current.y, window.innerHeight - 56)),
       })
     }
     const onMouseUp = () => { toolbarDragging.current = false }
@@ -450,7 +452,7 @@ powered by Jojo labs`
             {/* Hidden native colour input */}
             <input
               type="color"
-              id="username-colour-picker"
+              ref={usernameColourPickerRef}
               value={usernameColour}
               onChange={e => setUsernameColour(e.target.value)}
               className="sr-only"
@@ -458,7 +460,7 @@ powered by Jojo labs`
 
             {/* Visible styled button that triggers it */}
             <button
-              onClick={() => document.getElementById('username-colour-picker').click()}
+              onClick={() => usernameColourPickerRef.current.click()}
               className="relative w-12 h-12 rounded-full hover:scale-110 transition-transform"
               style={{
                 background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
@@ -598,8 +600,8 @@ powered by Jojo labs`
                   {/* Prev button */}
                   <button
                     onClick={handlePrev}
-                    disabled={currentIndex === 0}
-                    className={`absolute bottom-4 left-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold ${currentIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    disabled={isFirst}
+                    className={`absolute bottom-4 left-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold ${isFirst ? 'opacity-30 cursor-not-allowed' : ''}`}
                   >
                     ← Prev
                   </button>
@@ -607,8 +609,8 @@ powered by Jojo labs`
                   {/* Next button */}
                   <button
                     onClick={handleNext}
-                    disabled={currentIndex === DLES.length - 1}
-                    className={`absolute bottom-4 right-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold ${currentIndex === DLES.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    disabled={isLast}
+                    className={`absolute bottom-4 right-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold ${isLast ? 'opacity-30 cursor-not-allowed' : ''}`}
                   >
                     Next →
                   </button>
@@ -695,11 +697,11 @@ powered by Jojo labs`
           {mode === 'host' && (
             <>
               <div className="flex justify-center gap-4 py-3 border-t border-gray-800 shrink-0">
-                <button onClick={() => handleResult('win')} className="px-8 py-2 bg-green-800 hover:bg-green-700 rounded font-medium text-sm">
-                  Win
+                <button onClick={() => handleResult('win')} className="px-10 py-2.5 bg-green-700 hover:bg-green-600 rounded-lg font-semibold text-base text-white">
+                  ✓ Win
                 </button>
-                <button onClick={() => handleResult('fail')} className="px-8 py-2 bg-red-900 hover:bg-red-800 rounded font-medium text-sm">
-                  Fail
+                <button onClick={() => handleResult('fail')} className="px-10 py-2.5 bg-red-800 hover:bg-red-700 rounded-lg font-semibold text-base text-white">
+                  ✗ Fail
                 </button>
               </div>
               <div className="text-center py-1">
@@ -740,7 +742,7 @@ powered by Jojo labs`
               <p className="text-xs text-gray-600 text-center mt-4">No messages yet...</p>
             )}
             {messages.map((msg, i) => (
-              <div key={i} className="flex flex-col gap-0.5">
+              <div key={msg.timestamp ?? i} className="flex flex-col gap-0.5">
                 <span className="text-xs font-medium" style={{ color: msg.colour || '#E8500A' }}>{msg.username}</span>
                 <span className="text-sm text-gray-200 bg-gray-800 rounded-lg px-3 py-1.5 break-words">{msg.text}</span>
               </div>
@@ -835,7 +837,7 @@ powered by Jojo labs`
         {/* Rainbow colour picker */}
         <input
           type="color"
-          id="toolbar-colour-picker"
+          ref={toolbarColourPickerRef}
           value={activeColour}
           onChange={e => {
             setActiveColour(e.target.value)
@@ -844,7 +846,7 @@ powered by Jojo labs`
           className="sr-only"
         />
         <button
-          onClick={() => document.getElementById('toolbar-colour-picker').click()}
+          onClick={() => toolbarColourPickerRef.current.click()}
           className="relative w-8 h-8 rounded-full hover:scale-110 transition-transform"
           style={{
             background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
@@ -891,7 +893,7 @@ powered by Jojo labs`
       {showNoteInput && (
         <div
           className="fixed z-50 bg-gray-900 border border-gray-700 rounded-xl p-3 flex gap-2 shadow-xl w-72"
-          style={{ left: toolbarPos.x + 56, top: toolbarPos.y }}
+          style={{ left: Math.min(toolbarPos.x + 56, window.innerWidth - 296), top: toolbarPos.y }}
         >
           <input
             type="text"
@@ -915,7 +917,6 @@ powered by Jojo labs`
       {showRecap && (
         <div className="fixed inset-0 z-50 bg-gray-950 overflow-y-auto flex flex-col items-center py-12 px-6">
 
-          <div style={{ width: '100%', maxWidth: '600px' }}>
           <div
             ref={recapRef}
             style={{
@@ -1039,7 +1040,6 @@ powered by Jojo labs`
             <p style={{ textAlign: 'center', fontSize: '11px', color: '#374151', margin: 0 }}>
               Dles Night — powered by chaos
             </p>
-          </div>
           </div>
 
           <div className="flex gap-4 mt-6">
