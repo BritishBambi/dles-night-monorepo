@@ -16,8 +16,9 @@ win:
   icon: resources/icon.png
 nsis:
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: "DlesNight-Setup-${version}.exe"
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
