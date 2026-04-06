@@ -47,8 +47,8 @@ jobs:
         working-directory: apps/electron
         run: |
           npm run build
-          ls -la out/
-          ls -la out/main/
+          dir out\
+          dir out\main\
 
       - name: Package Windows installer
         working-directory: apps/electron
