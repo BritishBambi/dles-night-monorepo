@@ -538,9 +538,9 @@ powered by Jojo labs`
 
             {/* Quick presets */}
             <div className="flex gap-2 flex-wrap justify-center">
-              {['#E8500A','#f472b6','#4ade80','#60a5fa','#facc15',
-                '#c084fc','#fb7185','#34d399','#ffffff','#ef4444',
-                '#a855f7','#f97316','#06b6d4','#84cc16'].map(c => (
+              {['#FF0000','#FF6600','#FFCC00','#99CC00','#00CC00',
+                '#00CC99','#00CCCC','#0066FF','#3300CC','#6600CC',
+                '#CC00CC','#FF0099','#FFFFFF'].map(c => (
                 <button
                   key={c}
                   onClick={() => setUsernameColour(c)}
