@@ -1,10 +1,12 @@
+import logo from '../assets/logo.png'
+
 export default function TitleBar() {
   return (
     <div
       className="flex items-center justify-between h-8 bg-gray-900 border-b border-gray-700 shrink-0 select-none"
       style={{ WebkitAppRegion: 'drag' }}
     >
-      <span className="px-3 text-sm font-semibold text-white">Dles Night</span>
+      <img src={logo} alt="Dles Night" className="h-5 w-auto px-3 box-content" />
 
       <div className="flex" style={{ WebkitAppRegion: 'no-drag' }}>
         <button

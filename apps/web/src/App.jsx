@@ -518,7 +518,7 @@ powered by Jojo labs`
   if (!usernameSet) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-6">
-        <h1 className="text-4xl font-bold text-orange-500">Dles Night</h1>
+        <img src="/logo.png" alt="Dles Night" className="h-16 w-auto" />
         <div className="flex flex-col items-center gap-3">
           <p className="text-gray-400">What's your name?</p>
           <input
@@ -595,7 +595,7 @@ powered by Jojo labs`
   if (mode === null) {
     return (
       <div className="h-screen bg-gray-950 text-white flex flex-col items-center justify-center gap-8">
-        <span className="text-4xl font-bold" style={{ color: '#E8500A' }}>Dles Night</span>
+        <img src="/logo.png" alt="Dles Night" className="h-16 w-auto" />
         <div className="flex gap-6">
           <button
             onClick={() => setMode('host')}
@@ -619,7 +619,7 @@ powered by Jojo labs`
 
       {/* Top bar */}
       <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
-        <span className="text-lg font-bold" style={{ color: '#E8500A' }}>Dles Night</span>
+        <img src="/logo.png" alt="Dles Night" className="h-8 w-auto" />
         <span className="absolute left-1/2 -translate-x-1/2 text-sm text-gray-400">
           {DLES[currentIndex].name} — Game {currentIndex + 1} of {DLES.length}
         </span>
