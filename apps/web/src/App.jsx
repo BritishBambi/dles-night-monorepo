@@ -90,6 +90,7 @@ function getVideoContentRect(videoEl, panelEl) {
 
 function App() {
   const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game'
+  const [activeDles, setActiveDles] = useState(DLES)
   const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [viewerStream, setViewerStream] = useState(null)
@@ -122,6 +123,7 @@ function App() {
   const recapRef = useRef(null)
   const sessionSyncRef = useRef(null)
   const currentIndexRef = useRef(currentIndex)
+  const activeDlesRef = useRef(DLES)
   const usernameColourPickerRef = useRef(null)
   const toolbarColourPickerRef = useRef(null)
   const connectionTimeoutRef = useRef(null)
@@ -207,6 +209,10 @@ function App() {
   }, [currentIndex])
 
   useEffect(() => {
+    activeDlesRef.current = activeDles
+  }, [activeDles])
+
+  useEffect(() => {
     if (screen !== 'game') return
     fetchWinRate()
   }, [screen])
@@ -231,6 +237,7 @@ function App() {
         if (event.type === 'state-sync') {
           setSessionResults(event.sessionResults)
           setCurrentIndex(event.currentIndex)
+          if (event.dleList?.length) setActiveDles(event.dleList)
         }
       },
       (users) => setConnectedUsers(users),
@@ -258,7 +265,7 @@ function App() {
         if (newNotes.length === 0) return prev
         return [...prev, ...newNotes.map(n => ({
           ...n,
-          dleName: DLES[currentIndexRef.current]?.name || 'Unknown'
+          dleName: activeDlesRef.current[currentIndexRef.current]?.name || 'Unknown'
         }))]
       })
     })
@@ -537,7 +544,7 @@ powered by Jojo labs`
       <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
         <img src="/logo.png" alt="Dles Night" className="h-8 w-auto" />
         <span className="absolute left-1/2 -translate-x-1/2 text-sm text-gray-400">
-          {DLES[currentIndex].name} — Game {currentIndex + 1} of {DLES.length}
+          {activeDles[currentIndex].name} — Game {currentIndex + 1} of {activeDles.length}
         </span>
         <div className="ml-auto flex items-center gap-4">
           {winRate && (

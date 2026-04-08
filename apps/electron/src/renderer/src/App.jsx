@@ -68,6 +68,8 @@ function StickyNote({ note, onMove, onDelete }) {
 
 function App() {
   const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game'
+  const [randomMode, setRandomMode] = useState(false)
+  const [activeDles, setActiveDles] = useState(DLES)
   const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [streaming, setStreaming] = useState(false)
@@ -105,7 +107,7 @@ function App() {
   const toolbarOffset = useRef({ x: 0, y: 0 })
 
   const isFirst = currentIndex === 0
-  const isLast = currentIndex === DLES.length - 1
+  const isLast = currentIndex === activeDles.length - 1
 
   const handlePrev = () => {
     if (currentIndex > 0) {
@@ -115,7 +117,7 @@ function App() {
   }
 
   const handleNext = () => {
-    if (currentIndex < DLES.length - 1) {
+    if (currentIndex < activeDles.length - 1) {
       setCurrentIndex(prev => prev + 1)
       if (notesRef.current) notesRef.current.clearAll()
     }
@@ -154,6 +156,19 @@ function App() {
     await startStreaming()
   }
 
+  const getActiveDles = async () => {
+    if (!randomMode) return DLES
+    try {
+      const res = await fetch('https://raw.githubusercontent.com/aukspot/dles/main/src/lib/data/dles.json')
+      const all = await res.json()
+      const shuffled = [...all].sort(() => Math.random() - 0.5)
+      return shuffled.slice(0, 20).map(d => ({ name: d.name, url: d.url }))
+    } catch (err) {
+      console.error('Failed to fetch dles list:', err)
+      return DLES
+    }
+  }
+
   useEffect(() => {
     if (videoRef.current && viewerStream) {
       videoRef.current.srcObject = viewerStream
@@ -183,7 +198,7 @@ function App() {
 
     const setup = async () => {
       await window.api.dleView.create()
-      await window.api.dleView.navigate(DLES[currentIndex].url)
+      await window.api.dleView.navigate(activeDles[currentIndex].url)
     }
     setup()
 
@@ -195,7 +210,7 @@ function App() {
   // Navigate WebContentsView when currentIndex changes
   useEffect(() => {
     if (screen !== 'game' || !isElectron) return
-    window.api.dleView.navigate(DLES[currentIndex].url)
+    window.api.dleView.navigate(activeDles[currentIndex].url)
   }, [currentIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track bounds of the dle panel placeholder and sync to main process
@@ -270,10 +285,11 @@ function App() {
     )
 
     sessionSyncRef.current = ss
+    ss.setActiveDles(activeDles)
     ss.connect(username, usernameColour)
 
     return () => ss.disconnect()
-  }, [screen])
+  }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchWinRate = async () => {
     const { data } = await supabase.from('win_rate').select('*').single()
@@ -283,7 +299,7 @@ function App() {
   const handleResult = async (result) => {
     if (sessionComplete) return
 
-    const dle = DLES[currentIndex]
+    const dle = activeDles[currentIndex]
     const entry = { name: dle.name, url: dle.url, result }
     const newResults = [...sessionResults, entry]
     setSessionResults(newResults)
@@ -310,7 +326,7 @@ function App() {
       console.error('Failed to update win rate:', err)
     }
 
-    if (currentIndex < DLES.length - 1) {
+    if (currentIndex < activeDles.length - 1) {
       const nextIndex = currentIndex + 1
       setCurrentIndex(nextIndex)
       if (notesRef.current) notesRef.current.clearAll()
@@ -333,7 +349,7 @@ function App() {
         if (newNotes.length === 0) return prev
         return [...prev, ...newNotes.map(n => ({
           ...n,
-          dleName: DLES[currentIndexRef.current]?.name || 'Unknown'
+          dleName: activeDles[currentIndexRef.current]?.name || 'Unknown'
         }))]
       })
     })
@@ -469,9 +485,19 @@ powered by Jojo labs`
             Play
           </button>
 
-          {/* Mode toggles — placeholder */}
+          {/* Mode toggles */}
           <div className="flex flex-col items-center gap-2">
-            {['Random Mode', 'Drinking Mode', 'Chaos Mode'].map(label => (
+            <button
+              onClick={() => setRandomMode(prev => !prev)}
+              className={`px-5 py-2 rounded-lg text-sm border transition-colors ${
+                randomMode
+                  ? 'bg-orange-600 border-orange-500 text-white'
+                  : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-gray-600'
+              }`}
+            >
+              Random Mode
+            </button>
+            {['Drinking Mode', 'Chaos Mode'].map(label => (
               <button
                 key={label}
                 disabled
@@ -505,7 +531,12 @@ powered by Jojo labs`
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && username.trim() && setScreen('game')}
+            onKeyDown={async e => {
+              if (e.key !== 'Enter' || !username.trim()) return
+              const dles = await getActiveDles()
+              setActiveDles(dles)
+              setScreen('game')
+            }}
             placeholder="Enter your name..."
             className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 w-64 text-center"
             autoFocus
@@ -561,7 +592,12 @@ powered by Jojo labs`
             </p>
           </div>
           <button
-            onClick={() => username.trim() && setScreen('game')}
+            onClick={async () => {
+              if (!username.trim()) return
+              const dles = await getActiveDles()
+              setActiveDles(dles)
+              setScreen('game')
+            }}
             className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold"
           >
             Let's go
@@ -580,7 +616,7 @@ powered by Jojo labs`
       <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
         <img src={logo} alt="Dles Night" className="h-8 w-auto" />
         <span className="absolute left-1/2 -translate-x-1/2 text-sm text-gray-400">
-          {DLES[currentIndex].name} — Game {currentIndex + 1} of {DLES.length}
+          {activeDles[currentIndex].name} — Game {currentIndex + 1} of {activeDles.length}
         </span>
         <div className="ml-auto flex items-center gap-4">
           {winRate && (
@@ -631,10 +667,10 @@ powered by Jojo labs`
               /* Fallback iframe for web/non-Electron */
               <div className="absolute inset-0">
                 <iframe
-                  key={DLES[currentIndex].url}
-                  src={DLES[currentIndex].url}
+                  key={activeDles[currentIndex].url}
+                  src={activeDles[currentIndex].url}
                   className="w-full h-full border-0"
-                  title={DLES[currentIndex].name}
+                  title={activeDles[currentIndex].name}
                 />
               </div>
             )}
@@ -699,10 +735,10 @@ powered by Jojo labs`
               </div>
               <div className="text-center py-1">
                 <button
-                  onClick={() => window.open(DLES[currentIndex].url, '_blank')}
+                  onClick={() => window.open(activeDles[currentIndex].url, '_blank')}
                   className="text-xs text-gray-600 hover:text-gray-400"
                 >
-                  ↗ Open {DLES[currentIndex].name} in browser
+                  ↗ Open {activeDles[currentIndex].name} in browser
                 </button>
               </div>
             </>

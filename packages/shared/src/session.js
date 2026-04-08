@@ -6,6 +6,11 @@ export class SessionSync {
     this.onEvent = onEvent
     this.onPresenceUpdate = onPresenceUpdate
     this.channel = null
+    this.activeDles = []
+  }
+
+  setActiveDles(arr) {
+    this.activeDles = arr
   }
 
   async connect(username, colour) {
@@ -96,7 +101,7 @@ export class SessionSync {
     this.channel.send({
       type: 'broadcast',
       event: 'session-sync',
-      payload: { sessionResults, currentIndex, sessionComplete }
+      payload: { sessionResults, currentIndex, sessionComplete, dleList: this.activeDles }
     })
   }
 
