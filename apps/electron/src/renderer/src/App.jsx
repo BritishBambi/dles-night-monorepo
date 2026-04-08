@@ -113,6 +113,7 @@ function App() {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1)
       if (notesRef.current) notesRef.current.clearAll()
+      sessionSyncRef.current?.broadcastAdvance(currentIndex - 1)
     }
   }
 
@@ -120,6 +121,7 @@ function App() {
     if (currentIndex < activeDles.length - 1) {
       setCurrentIndex(prev => prev + 1)
       if (notesRef.current) notesRef.current.clearAll()
+      sessionSyncRef.current?.broadcastAdvance(currentIndex + 1)
     }
   }
 
