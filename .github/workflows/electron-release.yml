@@ -2,10 +2,6 @@ name: Electron Windows Build & Release
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'apps/electron/**'
     tags:
       - 'v*'
 
@@ -42,6 +38,9 @@ jobs:
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" > .env
           echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
+          echo "VITE_TURN_URL=${{ secrets.VITE_TURN_URL }}" >> .env
+          echo "VITE_TURN_USERNAME=${{ secrets.VITE_TURN_USERNAME }}" >> .env
+          echo "VITE_TURN_CREDENTIAL=${{ secrets.VITE_TURN_CREDENTIAL }}" >> .env
 
       - name: Build electron-vite bundles
         working-directory: apps/electron
