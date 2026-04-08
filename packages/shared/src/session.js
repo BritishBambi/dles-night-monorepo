@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 export class SessionSync {
-  constructor(onEvent, onPresenceUpdate, sessionId = 'nightsession') {
+  constructor(onEvent, onPresenceUpdate, sessionId = 'nightsession3') {
     this.sessionId = sessionId
     this.onEvent = onEvent
     this.onPresenceUpdate = onPresenceUpdate
