@@ -617,13 +617,13 @@ powered by Jojo labs`
         <div className="flex gap-6">
           <button
             onClick={() => setMode('host')}
-            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium"
+            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium text-white transition-colors"
           >
             I'm Julie 🎮
           </button>
           <button
             onClick={joinAsViewer}
-            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium"
+            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium text-white transition-colors"
           >
             Join Session 👀
           </button>
@@ -1059,30 +1059,20 @@ powered by Jojo labs`
 
           <div
             ref={recapRef}
-            style={{
-              backgroundColor: '#111827',
-              borderRadius: '16px',
-              padding: '32px',
-              width: '100%',
-              maxWidth: '600px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px',
-              fontFamily: 'sans-serif',
-            }}
+            className="w-full max-w-[600px] bg-gray-900 rounded-2xl p-8 flex flex-col gap-6"
           >
             {/* Header */}
-            <div style={{ textAlign: 'center' }}>
-              <h1 style={{ color: '#E8500A', fontSize: '28px', fontWeight: 'bold', margin: 0 }}>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-orange-600">
                 Dles Night
               </h1>
-              <p style={{ color: '#9ca3af', fontSize: '13px', marginTop: '4px' }}>
+              <p className="text-[13px] text-gray-400 mt-1">
                 {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
 
             {/* Win rates */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="grid grid-cols-2 gap-4">
               {[
                 {
                   label: 'Tonight',
@@ -1099,42 +1089,25 @@ powered by Jojo labs`
                     : 0
                 }
               ].map(stat => (
-                <div key={stat.label} style={{
-                  backgroundColor: '#1f2937',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  textAlign: 'center'
-                }}>
-                  <p style={{ color: '#6b7280', fontSize: '11px', margin: '0 0 4px' }}>{stat.label}</p>
-                  <p style={{ color: '#ffffff', fontSize: '28px', fontWeight: 'bold', margin: 0 }}>{stat.score}</p>
-                  <p style={{ color: '#E8500A', fontSize: '13px', fontWeight: '600', margin: '2px 0 0' }}>{stat.pct}%</p>
+                <div key={stat.label} className="bg-gray-800 rounded-xl p-4 text-center">
+                  <p className="text-[11px] text-gray-500 mb-1">{stat.label}</p>
+                  <p className="text-3xl font-bold text-white leading-none">{stat.score}</p>
+                  <p className="text-[13px] font-semibold text-orange-600 mt-0.5">{stat.pct}%</p>
                 </div>
               ))}
             </div>
 
             {/* Dle results */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] text-gray-500 uppercase tracking-wider">
                 Tonight's Games
               </p>
               {sessionResults.map((r, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: '#1f2937',
-                  borderRadius: '8px',
-                  padding: '8px 16px'
-                }}>
-                  <span style={{ color: '#e5e7eb', fontSize: '14px' }}>{r.name}</span>
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    padding: '3px 10px',
-                    borderRadius: '999px',
-                    backgroundColor: r.result === 'win' ? '#14532d' : '#7f1d1d',
-                    color: r.result === 'win' ? '#4ade80' : '#f87171'
-                  }}>
+                <div key={i} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2">
+                  <span className="text-sm text-gray-200">{r.name}</span>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                    r.result === 'win' ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'
+                  }`}>
                     {r.result === 'win' ? '✓ Win' : '✗ Fail'}
                   </span>
                 </div>
@@ -1143,32 +1116,25 @@ powered by Jojo labs`
 
             {/* Session notes log */}
             {sessionNotes.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <p style={{
-                  color: '#6b7280', fontSize: '11px',
-                  textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0
-                }}>
+              <div className="flex flex-col gap-3">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wider">
                   Notes from Tonight
                 </p>
                 {sessionNotes.map((note, i) => (
-                  <div key={note.id || i} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    backgroundColor: '#1f2937',
-                    borderRadius: '8px',
-                    padding: '10px 14px',
-                    borderLeft: `3px solid ${note.colour}`,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: note.colour, fontSize: '11px', fontWeight: '600' }}>
+                  <div
+                    key={note.id || i}
+                    className="flex flex-col gap-1 bg-gray-800 rounded-lg px-3.5 py-2.5 border-l-[3px]"
+                    style={{ borderColor: note.colour }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] font-semibold" style={{ color: note.colour }}>
                         {note.username}
                       </span>
-                      <span style={{ color: '#4b5563', fontSize: '10px' }}>
+                      <span className="text-[10px] text-gray-600">
                         {note.dleName}
                       </span>
                     </div>
-                    <p style={{ color: '#d1d5db', fontSize: '13px', margin: 0 }}>
+                    <p className="text-[13px] text-gray-300">
                       {note.text}
                     </p>
                   </div>
@@ -1177,7 +1143,7 @@ powered by Jojo labs`
             )}
 
             {/* Footer */}
-            <p style={{ textAlign: 'center', fontSize: '11px', color: '#374151', margin: 0 }}>
+            <p className="text-center text-[11px] text-gray-700">
               Dles Night — powered by chaos
             </p>
           </div>
@@ -1191,7 +1157,7 @@ powered by Jojo labs`
             </button>
             <button
               onClick={() => setShowRecap(false)}
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl"
+              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold"
             >
               Back to Session
             </button>
