@@ -75,6 +75,11 @@ export class DlesRTC {
     this.localStream = stream
     this.isHost = true
 
+    if (this.channel) {
+      supabase.removeChannel(this.channel)
+      this.channel = null
+    }
+
     this.channel = supabase.channel(`dles-${this.sessionId}`, {
       config: {
         broadcast: { self: false },
@@ -211,8 +216,15 @@ export class DlesRTC {
     })
 
     this.channel.on('broadcast', { event: 'host-ready' }, async () => {
-      if (this.connected) return // already have a stream, ignore
       if (this.offerInFlight) return
+      if (this.connected) {
+        // Host started streaming after we connected — reset and renegotiate
+        this.connected = false
+        if (this.peerConnections['host']) {
+          this.peerConnections['host'].close()
+          delete this.peerConnections['host']
+        }
+      }
       console.log('Viewer received host-ready, resetting and sending fresh offer')
 
       // Close old peer connection and make a fresh one
