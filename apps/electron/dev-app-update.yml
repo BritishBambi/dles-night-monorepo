@@ -1,3 +1,4 @@
-provider: generic
-url: https://example.com/auto-updates
+provider: github
+owner: BritishBambi
+repo: dles-night-monorepo
 updaterCacheDirName: dles-night-app-updater
