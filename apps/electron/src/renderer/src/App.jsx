@@ -101,6 +101,7 @@ function App() {
   const recapRef = useRef(null)
   const sessionSyncRef = useRef(null)
   const currentIndexRef = useRef(currentIndex)
+  const pendingDlesRef = useRef(null)
   const usernameColourPickerRef = useRef(null)
   const [toolbarPos, setToolbarPos] = useState({ x: 16, y: 80 })
   const toolbarDragging = useRef(false)
@@ -287,7 +288,7 @@ function App() {
     )
 
     sessionSyncRef.current = ss
-    ss.setActiveDles(activeDles)
+    ss.setActiveDles(pendingDlesRef.current ?? activeDles)
     ss.connect(username, usernameColour)
 
     return () => ss.disconnect()
@@ -536,6 +537,7 @@ powered by Jojo labs`
             onKeyDown={async e => {
               if (e.key !== 'Enter' || !username.trim()) return
               const dles = await getActiveDles()
+              pendingDlesRef.current = dles
               setActiveDles(dles)
               setScreen('game')
             }}
@@ -597,6 +599,7 @@ powered by Jojo labs`
             onClick={async () => {
               if (!username.trim()) return
               const dles = await getActiveDles()
+              pendingDlesRef.current = dles
               setActiveDles(dles)
               setScreen('game')
             }}
