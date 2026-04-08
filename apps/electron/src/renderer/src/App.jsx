@@ -67,7 +67,7 @@ function StickyNote({ note, onMove, onDelete }) {
 }
 
 function App() {
-  const [mode, setMode] = useState(null) // null | 'host' | 'viewer'
+  const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game'
   const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [streaming, setStreaming] = useState(false)
@@ -76,7 +76,6 @@ function App() {
   const [messages, setMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [username, setUsername] = useState('')
-  const [usernameSet, setUsernameSet] = useState(false)
   const [usernameColour, setUsernameColour] = useState('#E8500A')
   const [sessionResults, setSessionResults] = useState([])
   const [winRate, setWinRate] = useState(null)
@@ -120,14 +119,6 @@ function App() {
       setCurrentIndex(prev => prev + 1)
       if (notesRef.current) notesRef.current.clearAll()
     }
-  }
-
-  const joinAsViewer = async () => {
-    setMode('viewer')
-    rtcRef.current = new DlesRTC((stream) => {
-      setViewerStream(stream)
-    }, SESSION_ID, ICE_SERVERS)
-    await rtcRef.current.joinAsViewer()
   }
 
   const startStreaming = async () => {
@@ -186,9 +177,9 @@ function App() {
     currentIndexRef.current = currentIndex
   }, [currentIndex])
 
-  // Create WebContentsView when entering host mode
+  // Create WebContentsView when entering game screen
   useEffect(() => {
-    if (mode !== 'host' || !isElectron) return
+    if (screen !== 'game' || !isElectron) return
 
     const setup = async () => {
       await window.api.dleView.create()
@@ -199,17 +190,17 @@ function App() {
     return () => {
       window.api.dleView.destroy()
     }
-  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Navigate WebContentsView when currentIndex changes
   useEffect(() => {
-    if (mode !== 'host' || !isElectron) return
+    if (screen !== 'game' || !isElectron) return
     window.api.dleView.navigate(DLES[currentIndex].url)
   }, [currentIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track bounds of the dle panel placeholder and sync to main process
   useEffect(() => {
-    if (mode !== 'host' || !isElectron || !dlePanelRef.current) return
+    if (screen !== 'game' || !isElectron || !dlePanelRef.current) return
 
     const updateBounds = () => {
       const el = dlePanelRef.current
@@ -233,25 +224,25 @@ function App() {
       observer.disconnect()
       window.removeEventListener('resize', updateBounds)
     }
-  }, [mode, sessionComplete]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [screen, sessionComplete]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hide/show WebContentsView when session completes or recap is shown
   useEffect(() => {
     if (!isElectron) return
     if (sessionComplete || showRecap) {
       window.api.dleView.hide()
-    } else if (mode === 'host') {
+    } else if (screen === 'game') {
       window.api.dleView.show()
     }
   }, [sessionComplete, showRecap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'game') return
     fetchWinRate()
-  }, [mode])
+  }, [screen])
 
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'game') return
 
     const ss = new SessionSync(
       (event) => {
@@ -267,17 +258,12 @@ function App() {
           if (event.winRate) setWinRate(event.winRate)
           setShowRecap(true)
         }
-        if (event.type === 'state-request' && mode === 'host') {
+        if (event.type === 'state-request') {
           sessionSyncRef.current?.broadcastState(
             sessionResults,
             currentIndex,
             sessionComplete
           )
-        }
-        if (event.type === 'state-sync' && mode === 'viewer') {
-          setSessionResults(event.sessionResults)
-          setCurrentIndex(event.currentIndex)
-          if (event.sessionComplete) setSessionComplete(true)
         }
       },
       (users) => setConnectedUsers(users),
@@ -287,7 +273,7 @@ function App() {
     ss.connect(username, usernameColour)
 
     return () => ss.disconnect()
-  }, [mode])
+  }, [screen])
 
   const fetchWinRate = async () => {
     const { data } = await supabase.from('win_rate').select('*').single()
@@ -337,7 +323,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'game') return
     const sn = new StickyNotes((updatedNotes) => {
       setNotes(updatedNotes)
       // Add any new notes to the session log
@@ -354,17 +340,17 @@ function App() {
     notesRef.current = sn
     sn.connect()
     return () => sn.disconnect()
-  }, [mode])
+  }, [screen])
 
   useEffect(() => {
-    if (!mode || !usernameSet) return
+    if (screen !== 'game') return
     const chat = new SessionChat((msg) => {
       setMessages(prev => [...prev, msg])
     })
     chatRef.current = chat
     chat.connect()
     return () => chat.disconnect()
-  }, [mode, usernameSet])
+  }, [screen])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -453,10 +439,65 @@ powered by Jojo labs`
     }
   }, [])
 
-  // Username prompt
-  if (!usernameSet) {
+  // Main menu
+  if (screen === 'menu') {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+        <TitleBar />
+        {/* Settings cog — top right */}
+        <div className="flex justify-end px-4 pt-3">
+          <button
+            disabled
+            className="w-8 h-8 flex items-center justify-center text-gray-700 cursor-not-allowed"
+            title="Settings (coming soon)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Centre content */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-8">
+          <img src={logo} alt="Dles Night" className="h-20 w-auto" />
+
+          <button
+            onClick={() => setScreen('username')}
+            className="px-10 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-lg font-semibold transition-colors"
+          >
+            Play
+          </button>
+
+          {/* Mode toggles — placeholder */}
+          <div className="flex flex-col items-center gap-2">
+            {['Random Mode', 'Drinking Mode', 'Chaos Mode'].map(label => (
+              <button
+                key={label}
+                disabled
+                className="px-5 py-2 bg-gray-900 border border-gray-800 text-gray-600 rounded-lg text-sm cursor-not-allowed select-none"
+              >
+                {label} <span className="text-gray-700 text-xs ml-1">— coming soon</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            disabled
+            className="text-xs text-gray-700 cursor-not-allowed"
+          >
+            Edit Dle List
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Username / colour picker
+  if (screen === 'username') {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-6">
+        <TitleBar />
         <img src={logo} alt="Dles Night" className="h-16 w-auto" />
         <div className="flex flex-col items-center gap-3">
           <p className="text-gray-400">What's your name?</p>
@@ -464,7 +505,7 @@ powered by Jojo labs`
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && username.trim() && setUsernameSet(true)}
+            onKeyDown={e => e.key === 'Enter' && username.trim() && setScreen('game')}
             placeholder="Enter your name..."
             className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 w-64 text-center"
             autoFocus
@@ -520,33 +561,10 @@ powered by Jojo labs`
             </p>
           </div>
           <button
-            onClick={() => username.trim() && setUsernameSet(true)}
+            onClick={() => username.trim() && setScreen('game')}
             className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold"
           >
             Let's go
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Mode selection screen
-  if (mode === null) {
-    return (
-      <div className="h-screen bg-gray-950 text-white flex flex-col items-center justify-center gap-8">
-        <img src={logo} alt="Dles Night" className="h-16 w-auto" />
-        <div className="flex gap-6">
-          <button
-            onClick={() => setMode('host')}
-            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium"
-          >
-            I'm Julie 🎮
-          </button>
-          <button
-            onClick={joinAsViewer}
-            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium"
-          >
-            Join Session 👀
           </button>
         </div>
       </div>
@@ -591,89 +609,39 @@ powered by Jojo labs`
           {/* Panel area */}
           <div className="relative flex-1 min-h-0">
 
-            {mode === 'host' ? (
-              sessionComplete ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <p className="text-4xl">🎉</p>
-                  <h2 className="text-2xl font-bold text-white">Dles Complete!</h2>
-                  <p className="text-gray-400">End the session for the final summary</p>
-                  <button
-                    onClick={handleEndSession}
-                    className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold mt-2"
-                  >
-                    View Final Summary
-                  </button>
-                </div>
-              ) : isElectron ? (
-                /* WebContentsView placeholder — native layer renders on top of this */
-                <div
-                  ref={dlePanelRef}
-                  className="absolute inset-0 bg-black"
-                />
-              ) : (
-                /* Fallback iframe for web/non-Electron */
-                <div className="absolute inset-0">
-                  <iframe
-                    key={DLES[currentIndex].url}
-                    src={DLES[currentIndex].url}
-                    className="w-full h-full border-0"
-                    title={DLES[currentIndex].name}
-                  />
-                </div>
-              )
+            {sessionComplete ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                <p className="text-4xl">🎉</p>
+                <h2 className="text-2xl font-bold text-white">Dles Complete!</h2>
+                <p className="text-gray-400">End the session for the final summary</p>
+                <button
+                  onClick={handleEndSession}
+                  className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold mt-2"
+                >
+                  View Final Summary
+                </button>
+              </div>
+            ) : isElectron ? (
+              /* WebContentsView placeholder — native layer renders on top of this */
+              <div
+                ref={dlePanelRef}
+                className="absolute inset-0 bg-black"
+              />
             ) : (
-              // Viewer
-              <>
-                {viewerStream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="absolute inset-0 w-full h-full object-contain bg-black"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
-                    Waiting for Julie to start streaming...
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gray-950">
-                  <button
-                    onClick={async () => {
-                      setViewerStream(null)
-                      await rtcRef.current.reconnect()
-                    }}
-                    className="px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors"
-                  >
-                    ↺ Reconnect Stream
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-xs select-none">{streamVolume === 0 ? '🔇' : '🔊'}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={streamVolume}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value)
-                        setStreamVolume(v)
-                        localStorage.setItem('streamVolume', v)
-                        if (videoRef.current) videoRef.current.volume = v
-                      }}
-                      className="volume-slider"
-                      style={{
-                        background: `linear-gradient(to right, #E8500A 0%, #E8500A ${streamVolume * 100}%, #374151 ${streamVolume * 100}%, #374151 100%)`
-                      }}
-                    />
-                  </div>
-                </div>
-              </>
+              /* Fallback iframe for web/non-Electron */
+              <div className="absolute inset-0">
+                <iframe
+                  key={DLES[currentIndex].url}
+                  src={DLES[currentIndex].url}
+                  className="w-full h-full border-0"
+                  title={DLES[currentIndex].name}
+                />
+              </div>
             )}
           </div>
 
-          {/* Navigation + Streaming — host only, below dle panel */}
-          {mode === 'host' && !sessionComplete && (
+          {/* Navigation + Streaming */}
+          {!sessionComplete && (
             <div className="flex items-center justify-between px-4 py-2 border-t border-gray-800 bg-gray-950 shrink-0">
               {/* Prev / Next */}
               <div className="flex gap-2">
@@ -718,8 +686,8 @@ powered by Jojo labs`
             </div>
           )}
 
-          {/* Win / Fail — host only */}
-          {mode === 'host' && (
+          {/* Win / Fail */}
+          {(
             <>
               <div className="flex justify-center gap-4 py-3 border-t border-gray-800 shrink-0">
                 <button onClick={() => handleResult('win')} className="px-10 py-2.5 bg-green-700 hover:bg-green-600 rounded-lg font-semibold text-base text-white">

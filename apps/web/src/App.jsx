@@ -89,11 +89,9 @@ function getVideoContentRect(videoEl, panelEl) {
 }
 
 function App() {
-  const [mode, setMode] = useState(null) // null | 'host' | 'viewer'
+  const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game'
   const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [streaming, setStreaming] = useState(false)
-  const [streamEnded, setStreamEnded] = useState(false)
   const [viewerStream, setViewerStream] = useState(null)
   const [activeTool, setActiveTool] = useState('pen')
   const [activeColour, setActiveColour] = useState('#E8500A')
@@ -101,7 +99,6 @@ function App() {
   const [messages, setMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [username, setUsername] = useState('')
-  const [usernameSet, setUsernameSet] = useState(false)
   const [usernameColour, setUsernameColour] = useState('#E8500A')
   const [sessionResults, setSessionResults] = useState([])
   const [winRate, setWinRate] = useState(null)
@@ -110,7 +107,6 @@ function App() {
   const [newNoteText, setNewNoteText] = useState('')
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [showRecap, setShowRecap] = useState(false)
-  const [sessionComplete, setSessionComplete] = useState(false)
   const [connectedUsers, setConnectedUsers] = useState([])
   const [copied, setCopied] = useState(false)
   const [streamStatus, setStreamStatus] = useState(null)
@@ -133,27 +129,7 @@ function App() {
   const toolbarDragging = useRef(false)
   const toolbarOffset = useRef({ x: 0, y: 0 })
 
-  const isFirst = currentIndex === 0
-  const isLast = currentIndex === DLES.length - 1
-
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1)
-      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
-      if (notesRef.current) notesRef.current.clearAll()
-    }
-  }
-
-  const handleNext = () => {
-    if (currentIndex < DLES.length - 1) {
-      setCurrentIndex(prev => prev + 1)
-      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
-      if (notesRef.current) notesRef.current.clearAll()
-    }
-  }
-
   const joinAsViewer = async () => {
-    setMode('viewer')
     setStreamStatus('connecting')
     rtcRef.current = new DlesRTC((stream) => {
       setViewerStream(stream)
@@ -161,41 +137,6 @@ function App() {
     }, SESSION_ID, ICE_SERVERS)
     rtcRef.current.onConnectionState = (state) => setStreamStatus(state)
     await rtcRef.current.joinAsViewer()
-  }
-
-  const startStreaming = async () => {
-    // Open dle in new tab without stealing focus using a temporary anchor click
-    const a = document.createElement('a')
-    a.href = DLES[currentIndex].url
-    a.target = '_blank'
-    a.rel = 'noreferrer'
-    // This opens the tab but attempts to keep focus on current window
-    Object.assign(a.style, { position: 'fixed', opacity: 0 })
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    // Small delay then trigger getDisplayMedia while still focused on app
-    await new Promise(r => setTimeout(r, 300))
-    rtcRef.current = new DlesRTC(null, SESSION_ID, ICE_SERVERS)
-    const stream = await rtcRef.current.startBroadcast()
-    stream.getVideoTracks()[0].onended = () => {
-      setStreaming(false)
-      setStreamEnded(true)
-    }
-    setStreaming(true)
-    setStreamEnded(false)
-  }
-
-  const restartStreaming = async () => {
-    if (rtcRef.current) rtcRef.current.disconnect()
-    rtcRef.current = new DlesRTC(null, SESSION_ID, ICE_SERVERS)
-    const stream = await rtcRef.current.startBroadcast()
-    stream.getVideoTracks()[0].onended = () => {
-      setStreaming(false)
-      setStreamEnded(true)
-    }
-    setStreaming(true)
-    setStreamEnded(false)
   }
 
   useEffect(() => {
@@ -266,12 +207,12 @@ function App() {
   }, [currentIndex])
 
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'game') return
     fetchWinRate()
-  }, [mode])
+  }, [screen])
 
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'game') return
 
     const ss = new SessionSync(
       (event) => {
@@ -287,17 +228,9 @@ function App() {
           if (event.winRate) setWinRate(event.winRate)
           setShowRecap(true)
         }
-        if (event.type === 'state-request' && mode === 'host') {
-          sessionSyncRef.current?.broadcastState(
-            sessionResults,
-            currentIndex,
-            sessionComplete
-          )
-        }
-        if (event.type === 'state-sync' && mode === 'viewer') {
+        if (event.type === 'state-sync') {
           setSessionResults(event.sessionResults)
           setCurrentIndex(event.currentIndex)
-          if (event.sessionComplete) setSessionComplete(true)
         }
       },
       (users) => setConnectedUsers(users),
@@ -307,58 +240,15 @@ function App() {
     ss.connect(username, usernameColour)
 
     return () => ss.disconnect()
-  }, [mode])
+  }, [screen])
 
   const fetchWinRate = async () => {
     const { data } = await supabase.from('win_rate').select('*').single()
     if (data) setWinRate(data)
   }
 
-  const handleResult = async (result) => {
-    if (sessionComplete) return
-
-    const dle = DLES[currentIndex]
-    const entry = { name: dle.name, url: dle.url, result }
-    const newResults = [...sessionResults, entry]
-    setSessionResults(newResults)
-
-    let updatedWinRate = winRate
-    try {
-      const { data, error } = await supabase.from('win_rate').select('*').single()
-      if (error) throw error
-      await supabase
-        .from('win_rate')
-        .update({
-          total_played: data.total_played + 1,
-          total_won: result === 'win' ? data.total_won + 1 : data.total_won,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', data.id)
-      updatedWinRate = {
-        ...data,
-        total_played: data.total_played + 1,
-        total_won: result === 'win' ? data.total_won + 1 : data.total_won,
-      }
-      setWinRate(updatedWinRate)
-    } catch (err) {
-      console.error('Failed to update win rate:', err)
-    }
-
-    if (currentIndex < DLES.length - 1) {
-      const nextIndex = currentIndex + 1
-      setCurrentIndex(nextIndex)
-      if (sharedCanvasRef.current) sharedCanvasRef.current.broadcastClear()
-      if (notesRef.current) notesRef.current.clearAll()
-      sessionSyncRef.current?.broadcastResult(entry, nextIndex, newResults, updatedWinRate)
-      sessionSyncRef.current?.broadcastAdvance(nextIndex)
-    } else {
-      setSessionComplete(true)
-      sessionSyncRef.current?.broadcastResult(entry, currentIndex, newResults, updatedWinRate)
-    }
-  }
-
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'game') return
     const sn = new StickyNotes((updatedNotes) => {
       setNotes(updatedNotes)
       // Add any new notes to the session log
@@ -373,44 +263,42 @@ function App() {
       })
     })
 
-    // In viewer mode, align note coordinates to the actual video content area
-    if (mode === 'viewer') {
-      sn.setReferenceFrame(() => {
-        const video = videoRef.current
-        const panel = panelRef.current
-        if (!video || !panel || !video.videoWidth) return null
-        const contentRect = getVideoContentRect(video, panel)
-        const panelRect = panel.getBoundingClientRect()
-        return {
-          x: panelRect.x + contentRect.x,
-          y: panelRect.y + contentRect.y,
-          width: contentRect.width,
-          height: contentRect.height,
-        }
-      })
-    }
+    // Align note coordinates to the actual video content area
+    sn.setReferenceFrame(() => {
+      const video = videoRef.current
+      const panel = panelRef.current
+      if (!video || !panel || !video.videoWidth) return null
+      const contentRect = getVideoContentRect(video, panel)
+      const panelRect = panel.getBoundingClientRect()
+      return {
+        x: panelRect.x + contentRect.x,
+        y: panelRect.y + contentRect.y,
+        width: contentRect.width,
+        height: contentRect.height,
+      }
+    })
 
     notesRef.current = sn
     sn.connect()
     return () => sn.disconnect()
-  }, [mode])
+  }, [screen])
 
   useEffect(() => {
-    if (!mode || !usernameSet) return
+    if (screen !== 'game') return
     const chat = new SessionChat((msg) => {
       setMessages(prev => [...prev, msg])
     })
     chatRef.current = chat
     chat.connect()
     return () => chat.disconnect()
-  }, [mode, usernameSet])
+  }, [screen])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   useEffect(() => {
-    if (!mode || !canvasRef.current || !panelRef.current) return
+    if (screen !== 'game' || !canvasRef.current || !panelRef.current) return
 
     const canvas = canvasRef.current
     const panel = panelRef.current
@@ -430,7 +318,7 @@ function App() {
     const handleResize = () => {
       const video = videoRef.current
       let x = 0, y = 0, w, h
-      if (mode === 'viewer' && video && video.videoWidth) {
+      if (video && video.videoWidth) {
         const rect = getVideoContentRect(video, panel)
         x = Math.round(rect.x); y = Math.round(rect.y)
         w = Math.round(rect.width); h = Math.round(rect.height)
@@ -452,7 +340,7 @@ function App() {
       window.removeEventListener('resize', handleResize)
       sc.disconnect()
     }
-  }, [mode])
+  }, [screen])
 
   const handleEndSession = async () => {
     const { data } = await supabase.from('win_rate').select('*').single()
@@ -532,8 +420,41 @@ powered by Jojo labs`
     }
   }, [])
 
-  // Username prompt
-  if (!usernameSet) {
+  // Main menu
+  if (screen === 'menu') {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+        {/* Settings cog — top right */}
+        <div className="flex justify-end px-4 pt-3">
+          <button
+            disabled
+            className="w-8 h-8 flex items-center justify-center text-gray-700 cursor-not-allowed"
+            title="Settings (coming soon)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Centre content */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-8">
+          <img src="/logo.png" alt="Dles Night" className="h-20 w-auto" />
+
+          <button
+            onClick={() => setScreen('username')}
+            className="px-10 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-lg font-semibold transition-colors"
+          >
+            Join Lobby
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Username / colour picker
+  if (screen === 'username') {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-6">
         <img src="/logo.png" alt="Dles Night" className="h-16 w-auto" />
@@ -543,7 +464,7 @@ powered by Jojo labs`
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && username.trim() && setUsernameSet(true)}
+            onKeyDown={e => { if (e.key === 'Enter' && username.trim()) { joinAsViewer(); setScreen('game') } }}
             placeholder="Enter your name..."
             className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 w-64 text-center"
             autoFocus
@@ -599,33 +520,10 @@ powered by Jojo labs`
             </p>
           </div>
           <button
-            onClick={() => username.trim() && setUsernameSet(true)}
+            onClick={() => { if (username.trim()) { joinAsViewer(); setScreen('game') } }}
             className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-semibold"
           >
             Let's go
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Mode selection screen
-  if (mode === null) {
-    return (
-      <div className="h-screen bg-gray-950 text-white flex flex-col items-center justify-center gap-8">
-        <img src="/logo.png" alt="Dles Night" className="h-16 w-auto" />
-        <div className="flex gap-6">
-          <button
-            onClick={() => setMode('host')}
-            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium text-white transition-colors"
-          >
-            I'm Julie 🎮
-          </button>
-          <button
-            onClick={joinAsViewer}
-            className="px-8 py-5 bg-gray-800 hover:bg-gray-700 rounded-xl text-lg font-medium text-white transition-colors"
-          >
-            Join Session 👀
           </button>
         </div>
       </div>
@@ -677,183 +575,88 @@ powered by Jojo labs`
               }}
             />
 
-            {mode === 'host' ? (
-              sessionComplete ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <p className="text-4xl">🎉</p>
-                  <h2 className="text-2xl font-bold text-white">Dles Complete!</h2>
-                  <p className="text-gray-400">End the session for the final summary</p>
-                  <button
-                    onClick={handleEndSession}
-                    className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-semibold mt-2"
-                  >
-                    View Final Summary
-                  </button>
-                </div>
-              ) : (
-                <div className="absolute inset-0">
-                  <iframe
-                    key={DLES[currentIndex].url}
-                    src={DLES[currentIndex].url}
-                    className="w-full h-full border-0"
-                    title={DLES[currentIndex].name}
-                  />
-
-                  {/* Prev button */}
-                  <button
-                    onClick={handlePrev}
-                    disabled={isFirst}
-                    className={`absolute bottom-4 left-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold ${isFirst ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  >
-                    ← Prev
-                  </button>
-
-                  {/* Next button */}
-                  <button
-                    onClick={handleNext}
-                    disabled={isLast}
-                    className={`absolute bottom-4 right-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold ${isLast ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )
+            {viewerStream ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-contain bg-black"
+              />
             ) : (
-              // Viewer
-              <>
-                {viewerStream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="absolute inset-0 w-full h-full object-contain bg-black"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
-                    Waiting for Julie to start streaming...
-                  </div>
-                )}
-                {needsUnmute && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <button
-                      onClick={() => {
-                        if (videoRef.current) {
-                          videoRef.current.muted = false
-                          videoRef.current.volume = streamVolume
-                          videoRef.current.play().catch(() => {})
-                        }
-                        setNeedsUnmute(false)
-                      }}
-                      className="px-5 py-3 bg-gray-900/90 hover:bg-gray-800 text-white text-sm rounded-xl border border-gray-700 backdrop-blur-sm"
-                    >
-                      🔇 Click to unmute
-                    </button>
-                  </div>
-                )}
-                {streamStatus && !['connected', 'completed'].includes(streamStatus) && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
-                    <div className="text-center px-6 max-w-sm">
-                      {streamStatus === 'failed' ? (
-                        <p className="text-red-400 text-sm">Connection failed — your network may be blocking the stream. Click Reconnect to try again.</p>
-                      ) : streamStatus === 'disconnected' ? (
-                        <p className="text-yellow-400 text-sm">Stream disconnected — attempting to reconnect...</p>
-                      ) : streamStatus === 'timeout' ? (
-                        <p className="text-yellow-400 text-sm">Taking longer than expected — try clicking Reconnect or switching networks.</p>
-                      ) : (
-                        <p className="text-gray-400 text-sm">Connecting to stream...</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gray-950">
-                  <button
-                    onClick={async () => {
-                      setViewerStream(null)
-                      setStreamStatus('connecting')
-                      await rtcRef.current.reconnect()
-                    }}
-                    className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-                      streamStatus === 'failed' || streamStatus === 'timeout'
-                        ? 'bg-orange-600 hover:bg-orange-500 text-white animate-pulse'
-                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
-                    }`}
-                  >
-                    ↺ Reconnect Stream
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-xs select-none">{streamVolume === 0 ? '🔇' : '🔊'}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={streamVolume}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value)
-                        setStreamVolume(v)
-                        localStorage.setItem('streamVolume', v)
-                        if (videoRef.current) videoRef.current.volume = v
-                      }}
-                      className="volume-slider"
-                      style={{
-                        background: `linear-gradient(to right, #E8500A 0%, #E8500A ${streamVolume * 100}%, #374151 ${streamVolume * 100}%, #374151 100%)`
-                      }}
-                    />
-                  </div>
-                </div>
-              </>
+              <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+                Waiting for Julie to start streaming...
+              </div>
             )}
-          </div>
-
-          {/* Streaming status — host only */}
-          {mode === 'host' && !sessionComplete && (
-            <div className="flex items-center justify-center gap-3 py-2 border-t border-gray-800 bg-gray-950 shrink-0">
-              {!streaming ? (
+            {needsUnmute && (
+              <div className="absolute inset-0 flex items-center justify-center">
                 <button
-                  onClick={startStreaming}
-                  className="px-4 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors flex items-center gap-2"
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.muted = false
+                      videoRef.current.volume = streamVolume
+                      videoRef.current.play().catch(() => {})
+                    }
+                    setNeedsUnmute(false)
+                  }}
+                  className="px-5 py-3 bg-gray-900/90 hover:bg-gray-800 text-white text-sm rounded-xl border border-gray-700 backdrop-blur-sm"
                 >
-                  📡 Stream to viewers
+                  🔇 Click to unmute
                 </button>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-xs text-gray-400">Streaming to viewers</span>
-                  </div>
-                  <button
-                    onClick={restartStreaming}
-                    className="text-xs text-gray-600 hover:text-gray-400"
-                  >
-                    ↺ Restart
-                  </button>
+              </div>
+            )}
+            {streamStatus && !['connected', 'completed'].includes(streamStatus) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
+                <div className="text-center px-6 max-w-sm">
+                  {streamStatus === 'failed' ? (
+                    <p className="text-red-400 text-sm">Connection failed — your network may be blocking the stream. Click Reconnect to try again.</p>
+                  ) : streamStatus === 'disconnected' ? (
+                    <p className="text-yellow-400 text-sm">Stream disconnected — attempting to reconnect...</p>
+                  ) : streamStatus === 'timeout' ? (
+                    <p className="text-yellow-400 text-sm">Taking longer than expected — try clicking Reconnect or switching networks.</p>
+                  ) : (
+                    <p className="text-gray-400 text-sm">Connecting to stream...</p>
+                  )}
                 </div>
-              )}
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gray-950">
+              <button
+                onClick={async () => {
+                  setViewerStream(null)
+                  setStreamStatus('connecting')
+                  await rtcRef.current.reconnect()
+                }}
+                className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                  streamStatus === 'failed' || streamStatus === 'timeout'
+                    ? 'bg-orange-600 hover:bg-orange-500 text-white animate-pulse'
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
+                }`}
+              >
+                ↺ Reconnect Stream
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 text-xs select-none">{streamVolume === 0 ? '🔇' : '🔊'}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={streamVolume}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value)
+                    setStreamVolume(v)
+                    localStorage.setItem('streamVolume', v)
+                    if (videoRef.current) videoRef.current.volume = v
+                  }}
+                  className="volume-slider"
+                  style={{
+                    background: `linear-gradient(to right, #E8500A 0%, #E8500A ${streamVolume * 100}%, #374151 ${streamVolume * 100}%, #374151 100%)`
+                  }}
+                />
+              </div>
             </div>
-          )}
-
-          {/* Win / Fail — host only */}
-          {mode === 'host' && (
-            <>
-              <div className="flex justify-center gap-4 py-3 border-t border-gray-800 shrink-0">
-                <button onClick={() => handleResult('win')} className="px-10 py-2.5 bg-green-700 hover:bg-green-600 rounded-lg font-semibold text-base text-white">
-                  ✓ Win
-                </button>
-                <button onClick={() => handleResult('fail')} className="px-10 py-2.5 bg-red-800 hover:bg-red-700 rounded-lg font-semibold text-base text-white">
-                  ✗ Fail
-                </button>
-              </div>
-              <div className="text-center py-1">
-                <button
-                  onClick={() => window.open(DLES[currentIndex].url, '_blank')}
-                  className="text-xs text-gray-600 hover:text-gray-400"
-                >
-                  ↗ Open {DLES[currentIndex].name} in browser
-                </button>
-              </div>
-            </>
-          )}
+          </div>
 
         </div>
 
