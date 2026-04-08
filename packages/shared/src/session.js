@@ -118,6 +118,9 @@ export class SessionSync {
   }
 
   disconnect() {
-    if (this.channel) supabase.removeChannel(this.channel)
+    if (this.channel) {
+      supabase.removeChannel(this.channel)
+      this.channel = null
+    }
   }
 }
