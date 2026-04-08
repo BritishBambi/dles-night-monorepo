@@ -53,6 +53,10 @@ export class SessionSync {
       this.onEvent({ type: 'state-sync', ...payload })
     })
 
+    this.channel.on('broadcast', { event: 'dle-list-sync' }, ({ payload }) => {
+      this.onEvent({ type: 'dle-list-sync', ...payload })
+    })
+
     await new Promise(resolve => {
       this.channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -94,6 +98,14 @@ export class SessionSync {
       type: 'broadcast',
       event: 'end-session',
       payload: { sessionResults, winRate }
+    })
+  }
+
+  broadcastDleList() {
+    this.channel.send({
+      type: 'broadcast',
+      event: 'dle-list-sync',
+      payload: { dleList: this.activeDles }
     })
   }
 

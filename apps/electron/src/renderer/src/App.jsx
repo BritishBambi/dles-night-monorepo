@@ -289,7 +289,9 @@ function App() {
 
     sessionSyncRef.current = ss
     ss.setActiveDles(pendingDlesRef.current ?? activeDles)
-    ss.connect(username, usernameColour)
+    ss.connect(username, usernameColour).then(() => {
+      ss.broadcastDleList()
+    })
 
     return () => ss.disconnect()
   }, [screen]) // eslint-disable-line react-hooks/exhaustive-deps
