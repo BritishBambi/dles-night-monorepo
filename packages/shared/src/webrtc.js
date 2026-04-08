@@ -161,6 +161,8 @@ export class DlesRTC {
       const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       })
+      pc.pendingCandidates = []
+      pc.remoteDescriptionSet = false
       pc.ontrack = ({ streams }) => {
         console.log('Viewer got track!')
         if (streams[0]) {
@@ -207,14 +209,26 @@ export class DlesRTC {
       console.log('Viewer received host-answer, targeting:', payload.targetViewer, 'my id:', this.viewerId)
       if (payload.targetViewer === this.viewerId) {
         const pc = this.peerConnections['host']
+        if (pc.remoteDescriptionSet) return
         console.log('Viewer setting remote description')
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
+        pc.remoteDescriptionSet = true
+        for (const candidate of pc.pendingCandidates) {
+          await pc.addIceCandidate(candidate)
+        }
+        pc.pendingCandidates = []
       }
     })
 
     this.channel.on('broadcast', { event: 'host-ice' }, async ({ payload }) => {
       if (payload.targetViewer === this.viewerId) {
-        await this.peerConnections['host'].addIceCandidate(new RTCIceCandidate(payload.candidate))
+        const pc = this.peerConnections['host']
+        const candidate = new RTCIceCandidate(payload.candidate)
+        if (!pc.remoteDescription) {
+          pc.pendingCandidates.push(candidate)
+        } else {
+          await pc.addIceCandidate(candidate)
+        }
       }
     })
 
