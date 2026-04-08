@@ -166,7 +166,7 @@ export class DlesRTC {
     pc.remoteDescriptionSet = false
     pc.ontrack = ({ streams }) => {
       console.log('Viewer got track!')
-      if (streams[0]) {
+      if (streams[0] && !this.connected) {
         this.connected = true
         this.onStream(streams[0])
       }

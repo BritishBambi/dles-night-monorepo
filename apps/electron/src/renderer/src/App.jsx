@@ -166,7 +166,13 @@ function App() {
   useEffect(() => {
     if (videoRef.current && viewerStream) {
       videoRef.current.srcObject = viewerStream
-      videoRef.current.volume = streamVolume
+      videoRef.current.muted = true
+      videoRef.current.play()
+        .then(() => {
+          videoRef.current.muted = false
+          videoRef.current.volume = streamVolume
+        })
+        .catch(err => console.warn('Autoplay blocked:', err))
     }
   }, [viewerStream])
 
@@ -622,6 +628,7 @@ powered by Jojo labs`
                   <video
                     ref={videoRef}
                     autoPlay
+                    muted
                     playsInline
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                   />

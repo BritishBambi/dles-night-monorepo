@@ -114,6 +114,7 @@ function App() {
   const [connectedUsers, setConnectedUsers] = useState([])
   const [copied, setCopied] = useState(false)
   const [streamStatus, setStreamStatus] = useState(null)
+  const [needsUnmute, setNeedsUnmute] = useState(false)
   const rtcRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -200,8 +201,17 @@ function App() {
   useEffect(() => {
     if (videoRef.current && viewerStream) {
       videoRef.current.srcObject = viewerStream
-      videoRef.current.volume = streamVolume
-      videoRef.current.play().catch(err => console.warn('Autoplay blocked:', err))
+      videoRef.current.muted = true
+      videoRef.current.play()
+        .then(() => {
+          videoRef.current.muted = false
+          videoRef.current.volume = streamVolume
+          setNeedsUnmute(false)
+        })
+        .catch(err => {
+          console.warn('Autoplay blocked:', err)
+          setNeedsUnmute(true)
+        })
     }
   }, [viewerStream])
 
@@ -715,12 +725,30 @@ powered by Jojo labs`
                   <video
                     ref={videoRef}
                     autoPlay
+                    muted
                     playsInline
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
                     Waiting for Julie to start streaming...
+                  </div>
+                )}
+                {needsUnmute && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <button
+                      onClick={() => {
+                        if (videoRef.current) {
+                          videoRef.current.muted = false
+                          videoRef.current.volume = streamVolume
+                          videoRef.current.play().catch(() => {})
+                        }
+                        setNeedsUnmute(false)
+                      }}
+                      className="px-5 py-3 bg-gray-900/90 hover:bg-gray-800 text-white text-sm rounded-xl border border-gray-700 backdrop-blur-sm"
+                    >
+                      🔇 Click to unmute
+                    </button>
                   </div>
                 )}
                 {streamStatus && !['connected', 'completed'].includes(streamStatus) && (
