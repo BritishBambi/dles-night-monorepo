@@ -3,6 +3,15 @@ import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase,
 
 const SESSION_ID = 'nightsession'
 
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
+if (import.meta.env.VITE_TURN_URL) {
+  ICE_SERVERS.push({
+    urls: import.meta.env.VITE_TURN_URL,
+    username: import.meta.env.VITE_TURN_USERNAME,
+    credential: import.meta.env.VITE_TURN_CREDENTIAL,
+  })
+}
+
 function StickyNote({ note, onMove, onDelete }) {
   const ref = useRef(null)
   const dragging = useRef(false)
@@ -148,7 +157,7 @@ function App() {
     rtcRef.current = new DlesRTC((stream) => {
       setViewerStream(stream)
       setStreamStatus('connected')
-    }, SESSION_ID)
+    }, SESSION_ID, ICE_SERVERS)
     rtcRef.current.onConnectionState = (state) => setStreamStatus(state)
     await rtcRef.current.joinAsViewer()
   }
@@ -166,7 +175,7 @@ function App() {
     document.body.removeChild(a)
     // Small delay then trigger getDisplayMedia while still focused on app
     await new Promise(r => setTimeout(r, 300))
-    rtcRef.current = new DlesRTC(null, SESSION_ID)
+    rtcRef.current = new DlesRTC(null, SESSION_ID, ICE_SERVERS)
     const stream = await rtcRef.current.startBroadcast()
     stream.getVideoTracks()[0].onended = () => {
       setStreaming(false)
@@ -178,7 +187,7 @@ function App() {
 
   const restartStreaming = async () => {
     if (rtcRef.current) rtcRef.current.disconnect()
-    rtcRef.current = new DlesRTC(null, SESSION_ID)
+    rtcRef.current = new DlesRTC(null, SESSION_ID, ICE_SERVERS)
     const stream = await rtcRef.current.startBroadcast()
     stream.getVideoTracks()[0].onended = () => {
       setStreaming(false)

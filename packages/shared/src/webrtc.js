@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 export class DlesRTC {
-  constructor(onStream, sessionId = 'dles-default') {
+  constructor(onStream, sessionId = 'dles-default', iceServers = null) {
     this.peerConnections = {}
     this.localStream = null
     this.channel = null
@@ -9,6 +9,7 @@ export class DlesRTC {
     this.viewerId = crypto.randomUUID()
     this.onStream = onStream
     this.sessionId = sessionId
+    this.iceServers = iceServers || [{ urls: 'stun:stun.l.google.com:19302' }]
     this.offerSent = false
     this.connected = false
     this.onConnectionState = null
@@ -119,7 +120,7 @@ export class DlesRTC {
   // HOST: handle an incoming offer from a viewer
   async _handleViewerOffer(viewerId, offer) {
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      iceServers: this.iceServers
     })
     this.peerConnections[viewerId] = pc
 
@@ -159,7 +160,7 @@ export class DlesRTC {
 
   _makePc() {
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      iceServers: this.iceServers
     })
     pc.pendingCandidates = []
     pc.remoteDescriptionSet = false
