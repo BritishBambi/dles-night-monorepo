@@ -187,6 +187,7 @@ function App() {
     if (videoRef.current && viewerStream) {
       videoRef.current.srcObject = viewerStream
       videoRef.current.volume = streamVolume
+      videoRef.current.play().catch(err => console.warn('Autoplay blocked:', err))
     }
   }, [viewerStream])
 
