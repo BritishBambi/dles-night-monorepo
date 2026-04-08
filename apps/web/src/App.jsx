@@ -227,6 +227,7 @@ function App() {
           if (event.winRate) setWinRate(event.winRate)
         }
         if (event.type === 'advance') {
+          console.log('advance received', event.currentIndex)
           setCurrentIndex(event.currentIndex)
         }
         if (event.type === 'end-session') {
@@ -235,6 +236,7 @@ function App() {
           setShowRecap(true)
         }
         if (event.type === 'state-sync') {
+          console.log('state-sync received', event.currentIndex, event.dleList?.length)
           setSessionResults(event.sessionResults)
           setCurrentIndex(event.currentIndex)
           if (event.dleList?.length) setActiveDles(event.dleList)
