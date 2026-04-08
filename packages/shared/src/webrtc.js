@@ -151,38 +151,38 @@ export class DlesRTC {
     console.log('Host sent answer to viewer:', viewerId)
   }
 
+  _makePc() {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    })
+    pc.pendingCandidates = []
+    pc.remoteDescriptionSet = false
+    pc.ontrack = ({ streams }) => {
+      console.log('Viewer got track!')
+      if (streams[0]) {
+        this.connected = true
+        this.onStream(streams[0])
+      }
+    }
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) {
+        this.channel.send({
+          type: 'broadcast',
+          event: 'viewer-ice',
+          payload: { viewerId: this.viewerId, candidate }
+        })
+      }
+    }
+    return pc
+  }
+
   // VIEWER: join session and request stream from host
   async joinAsViewer() {
     this.channel = supabase.channel(`dles-${this.sessionId}`, {
       config: { broadcast: { self: false } }
     })
 
-    const makePc = () => {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      })
-      pc.pendingCandidates = []
-      pc.remoteDescriptionSet = false
-      pc.ontrack = ({ streams }) => {
-        console.log('Viewer got track!')
-        if (streams[0]) {
-          this.connected = true
-          this.onStream(streams[0])
-        }
-      }
-      pc.onicecandidate = ({ candidate }) => {
-        if (candidate) {
-          this.channel.send({
-            type: 'broadcast',
-            event: 'viewer-ice',
-            payload: { viewerId: this.viewerId, candidate }
-          })
-        }
-      }
-      return pc
-    }
-
-    this.peerConnections['host'] = makePc()
+    this.peerConnections['host'] = this._makePc()
 
     const sendOfferWithPc = (pc) => this._sendOffer(pc)
 
@@ -199,7 +199,7 @@ export class DlesRTC {
       if (this.peerConnections['host']) {
         this.peerConnections['host'].close()
       }
-      const newPc = makePc()
+      const newPc = this._makePc()
       this.peerConnections['host'] = newPc
 
       await sendOfferWithPc(newPc)
@@ -265,27 +265,8 @@ export class DlesRTC {
       delete this.peerConnections['host']
     }
 
-    const newPc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    })
+    const newPc = this._makePc()
     this.peerConnections['host'] = newPc
-
-    newPc.ontrack = ({ streams }) => {
-      if (streams[0]) {
-        this.connected = true
-        this.onStream(streams[0])
-      }
-    }
-
-    newPc.onicecandidate = ({ candidate }) => {
-      if (candidate) {
-        this.channel.send({
-          type: 'broadcast',
-          event: 'viewer-ice',
-          payload: { viewerId: this.viewerId, candidate }
-        })
-      }
-    }
 
     await this._sendOffer(newPc)
   }
