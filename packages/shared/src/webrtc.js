@@ -12,6 +12,7 @@ export class DlesRTC {
     this.iceServers = iceServers || [{ urls: 'stun:stun.l.google.com:19302' }]
     this.offerSent = false
     this.connected = false
+    this.offerInFlight = false
     this.onConnectionState = null
   }
 
@@ -211,6 +212,7 @@ export class DlesRTC {
 
     this.channel.on('broadcast', { event: 'host-ready' }, async () => {
       if (this.connected) return // already have a stream, ignore
+      if (this.offerInFlight) return
       console.log('Viewer received host-ready, resetting and sending fresh offer')
 
       // Close old peer connection and make a fresh one
@@ -231,6 +233,7 @@ export class DlesRTC {
         console.log('Viewer setting remote description')
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
         pc.remoteDescriptionSet = true
+        this.offerInFlight = false
         for (const candidate of pc.pendingCandidates) {
           await pc.addIceCandidate(candidate)
         }
@@ -259,10 +262,13 @@ export class DlesRTC {
     })
 
     // Send offer after subscribe in case host is already live
-    setTimeout(() => sendOfferWithPc(this.peerConnections['host']), 500)
+    setTimeout(() => {
+      if (!this.offerInFlight) sendOfferWithPc(this.peerConnections['host'])
+    }, 500)
   }
 
   async _sendOffer(pc) {
+    this.offerInFlight = true
     pc.addTransceiver('video', { direction: 'recvonly' })
     pc.addTransceiver('audio', { direction: 'recvonly' })
     const offer = await pc.createOffer()
