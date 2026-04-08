@@ -11,6 +11,7 @@ export class DlesRTC {
     this.sessionId = sessionId
     this.offerSent = false
     this.connected = false
+    this.onConnectionState = null
   }
 
   // HOST: start capturing screen and broadcasting
@@ -127,6 +128,11 @@ export class DlesRTC {
       pc.addTrack(track, this.localStream)
     })
 
+    // Log ICE state transitions for this viewer connection
+    pc.oniceconnectionstatechange = () => {
+      console.log('[DlesRTC] Host ICE state for viewer', viewerId, ':', pc.iceConnectionState)
+    }
+
     // Send ICE candidates to this specific viewer
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) {
@@ -171,6 +177,17 @@ export class DlesRTC {
           event: 'viewer-ice',
           payload: { viewerId: this.viewerId, candidate }
         })
+      }
+    }
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState
+      console.log('[DlesRTC] ICE state:', state)
+      if (this.onConnectionState) {
+        this.onConnectionState(state)
+      }
+      if (state === 'failed' && !this.isHost) {
+        console.warn('[DlesRTC] ICE connection failed, attempting reconnect...')
+        this.reconnect()
       }
     }
     return pc

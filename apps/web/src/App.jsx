@@ -104,6 +104,7 @@ function App() {
   const [sessionComplete, setSessionComplete] = useState(false)
   const [connectedUsers, setConnectedUsers] = useState([])
   const [copied, setCopied] = useState(false)
+  const [streamStatus, setStreamStatus] = useState(null)
   const rtcRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -117,6 +118,7 @@ function App() {
   const currentIndexRef = useRef(currentIndex)
   const usernameColourPickerRef = useRef(null)
   const toolbarColourPickerRef = useRef(null)
+  const connectionTimeoutRef = useRef(null)
   const [toolbarPos, setToolbarPos] = useState({ x: 16, y: 80 })
   const toolbarDragging = useRef(false)
   const toolbarOffset = useRef({ x: 0, y: 0 })
@@ -142,9 +144,12 @@ function App() {
 
   const joinAsViewer = async () => {
     setMode('viewer')
+    setStreamStatus('connecting')
     rtcRef.current = new DlesRTC((stream) => {
       setViewerStream(stream)
+      setStreamStatus('connected')
     }, SESSION_ID)
+    rtcRef.current.onConnectionState = (state) => setStreamStatus(state)
     await rtcRef.current.joinAsViewer()
   }
 
@@ -190,6 +195,18 @@ function App() {
       videoRef.current.play().catch(err => console.warn('Autoplay blocked:', err))
     }
   }, [viewerStream])
+
+  // Show a warning if ICE stays in a pending state for more than 15 seconds
+  useEffect(() => {
+    if (streamStatus === 'connecting' || streamStatus === 'new' || streamStatus === 'checking') {
+      connectionTimeoutRef.current = setTimeout(() => {
+        setStreamStatus('timeout')
+      }, 15000)
+    } else {
+      clearTimeout(connectionTimeoutRef.current)
+    }
+    return () => clearTimeout(connectionTimeoutRef.current)
+  }, [streamStatus])
 
   // Resize canvas to match actual video content area when stream connects or video dimensions change
   useEffect(() => {
@@ -697,13 +714,33 @@ powered by Jojo labs`
                     Waiting for Julie to start streaming...
                   </div>
                 )}
+                {streamStatus && !['connected', 'completed'].includes(streamStatus) && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
+                    <div className="text-center px-6 max-w-sm">
+                      {streamStatus === 'failed' ? (
+                        <p className="text-red-400 text-sm">Connection failed — your network may be blocking the stream. Click Reconnect to try again.</p>
+                      ) : streamStatus === 'disconnected' ? (
+                        <p className="text-yellow-400 text-sm">Stream disconnected — attempting to reconnect...</p>
+                      ) : streamStatus === 'timeout' ? (
+                        <p className="text-yellow-400 text-sm">Taking longer than expected — try clicking Reconnect or switching networks.</p>
+                      ) : (
+                        <p className="text-gray-400 text-sm">Connecting to stream...</p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gray-950">
                   <button
                     onClick={async () => {
                       setViewerStream(null)
+                      setStreamStatus('connecting')
                       await rtcRef.current.reconnect()
                     }}
-                    className="px-4 py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors"
+                    className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                      streamStatus === 'failed' || streamStatus === 'timeout'
+                        ? 'bg-orange-600 hover:bg-orange-500 text-white animate-pulse'
+                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
+                    }`}
                   >
                     ↺ Reconnect Stream
                   </button>
