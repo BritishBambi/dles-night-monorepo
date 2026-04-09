@@ -13,6 +13,7 @@ export class DlesRTC {
     this.offerSent = false
     this.connected = false
     this.offerInFlight = false
+    this.hasStream = false
     this.onConnectionState = null
   }
 
@@ -174,6 +175,7 @@ export class DlesRTC {
       console.log('Viewer got track!')
       if (streams[0] && !this.connected) {
         this.connected = true
+        this.hasStream = true
         this.onStream(streams[0])
       }
     }
@@ -217,8 +219,9 @@ export class DlesRTC {
 
     this.channel.on('broadcast', { event: 'host-ready' }, async () => {
       if (this.offerInFlight) return
-      if (this.connected) {
-        // Host started streaming after we connected — reset and renegotiate
+      if (this.connected && this.hasStream) return // stream is live and healthy, leave it alone
+      if (this.connected && !this.hasStream) {
+        // Connected to signalling but no stream yet — reset and renegotiate
         this.connected = false
         if (this.peerConnections['host']) {
           this.peerConnections['host'].close()
@@ -294,6 +297,7 @@ export class DlesRTC {
 
   async reconnect() {
     this.connected = false
+    this.hasStream = false
     this.offerSent = false
 
     if (this.peerConnections['host']) {
