@@ -101,6 +101,8 @@ function App() {
   const recapRef = useRef(null)
   const sessionSyncRef = useRef(null)
   const currentIndexRef = useRef(currentIndex)
+  const sessionResultsRef = useRef(sessionResults)
+  const sessionCompleteRef = useRef(sessionComplete)
   const pendingDlesRef = useRef(null)
   const usernameColourPickerRef = useRef(null)
   const [toolbarPos, setToolbarPos] = useState({ x: 16, y: 80 })
@@ -195,6 +197,14 @@ function App() {
     currentIndexRef.current = currentIndex
   }, [currentIndex])
 
+  useEffect(() => {
+    sessionResultsRef.current = sessionResults
+  }, [sessionResults])
+
+  useEffect(() => {
+    sessionCompleteRef.current = sessionComplete
+  }, [sessionComplete])
+
   // Create WebContentsView when entering game screen
   useEffect(() => {
     if (screen !== 'game' || !isElectron) return
@@ -278,9 +288,9 @@ function App() {
         }
         if (event.type === 'state-request') {
           sessionSyncRef.current?.broadcastState(
-            sessionResults,
-            currentIndex,
-            sessionComplete
+            sessionResultsRef.current,
+            currentIndexRef.current,
+            sessionCompleteRef.current
           )
         }
       },
