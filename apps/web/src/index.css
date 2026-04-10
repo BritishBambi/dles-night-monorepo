@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 .volume-slider {
   -webkit-appearance: none;
   appearance: none;
