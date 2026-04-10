@@ -90,22 +90,31 @@ export default function DleEditor({ onClose, initialDles }) {
     e.dataTransfer.effectAllowed = 'move'
   }
 
+  const getInsertIndex = (e, index) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return e.clientY < rect.top + rect.height / 2 ? index : index + 1
+  }
+
   const onDragOver = (e, index) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDragOverIndex(index)
+    setDragOverIndex(getInsertIndex(e, index))
   }
 
   const onDrop = (e, index) => {
     e.preventDefault()
     const from = dragIndex.current
+    const insertAt = getInsertIndex(e, index)
     setDragOverIndex(null)
     dragIndex.current = null
-    if (from === null || from === index) return
+    if (from === null) return
     setActiveDles(prev => {
       const next = [...prev]
       const [moved] = next.splice(from, 1)
-      next.splice(index, 0, moved)
+      // After removing `from`, all indices > from shift down by 1
+      const adjustedInsert = insertAt > from ? insertAt - 1 : insertAt
+      if (adjustedInsert === from) return prev
+      next.splice(adjustedInsert, 0, moved)
       return next
     })
   }
@@ -116,15 +125,16 @@ export default function DleEditor({ onClose, initialDles }) {
   }
 
   // Calculate per-row translateY for the shift animation
+  // dragOverIndex is now an insertion point (0..n), not a row index
   const getRowTransform = (index) => {
     const from = dragIndex.current
-    if (from === null || dragOverIndex === null || from === dragOverIndex) return 'translateY(0)'
-    const ROW_HEIGHT = 32 // approximate px height of each row
-    if (from < dragOverIndex) {
-      // dragging downward — rows between from+1 and dragOverIndex shift up
-      if (index > from && index <= dragOverIndex) return `translateY(-${ROW_HEIGHT}px)`
+    if (from === null || dragOverIndex === null) return 'translateY(0)'
+    const ROW_HEIGHT = 32
+    if (dragOverIndex > from) {
+      // dragging downward — rows from+1 to insertAt-1 shift up
+      if (index > from && index < dragOverIndex) return `translateY(-${ROW_HEIGHT}px)`
     } else {
-      // dragging upward — rows between dragOverIndex and from-1 shift down
+      // dragging upward — rows insertAt to from-1 shift down
       if (index >= dragOverIndex && index < from) return `translateY(${ROW_HEIGHT}px)`
     }
     return 'translateY(0)'
@@ -164,7 +174,8 @@ export default function DleEditor({ onClose, initialDles }) {
               <div className="flex flex-col">
                 {activeDles.map((dle, index) => {
                   const isDragging = dragIndex.current === index
-                  const isDropTarget = dragOverIndex === index && !isDragging
+                  const showLineTop = dragOverIndex === index && !isDragging
+                  const showLineBottom = dragOverIndex === activeDles.length && index === activeDles.length - 1 && !isDragging
                   return (
                     <div
                       key={dle.url}
@@ -180,9 +191,11 @@ export default function DleEditor({ onClose, initialDles }) {
                         transition: 'transform 150ms ease, opacity 150ms ease',
                       }}
                     >
-                      {/* Drop indicator line — appears at top of target row */}
-                      {isDropTarget && (
+                      {showLineTop && (
                         <div className="absolute top-0 left-2 right-2 h-0.5 bg-orange-500 rounded-full z-10 pointer-events-none" />
+                      )}
+                      {showLineBottom && (
+                        <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-500 rounded-full z-10 pointer-events-none" />
                       )}
                       <span className="text-gray-700 group-hover:text-gray-500 select-none text-sm leading-none shrink-0">⠿</span>
                       <span className="text-xs text-gray-600 font-mono w-4 shrink-0 text-right">{index + 1}</span>
