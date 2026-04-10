@@ -92,31 +92,31 @@ export default function DleEditor({ onClose, initialDles }) {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-gray-950 text-white overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-gray-950 text-white overflow-hidden">
       <TitleBar />
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Left panel — Active list */}
-        <div className="flex flex-col w-2/5 border-r border-gray-800 bg-gray-950">
+        {/* Left panel — Active list, fixed width */}
+        <div className="flex flex-col w-64 shrink-0 border-r border-gray-800 bg-gray-950 overflow-hidden">
           {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
-            <h2 className="text-base font-semibold text-white">Tonight's Dles</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-gray-300">
-              {activeDles.length} {activeDles.length === 1 ? 'dle' : 'dles'}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 shrink-0">
+            <h2 className="text-sm font-semibold text-white">Tonight's Dles</h2>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-gray-400">
+              {activeDles.length}
             </span>
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className="flex-1 overflow-y-auto py-1">
             {activeDles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-6">
-                <p className="text-gray-600 text-sm">No dles added yet</p>
-                <p className="text-gray-700 text-xs">Add some from the list on the right</p>
+              <div className="flex flex-col items-center justify-center h-full gap-1.5 text-center px-4">
+                <p className="text-gray-600 text-xs">No dles added yet</p>
+                <p className="text-gray-700 text-xs">Add from the list →</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col">
                 {activeDles.map((dle, index) => (
                   <div
                     key={dle.url}
@@ -125,27 +125,16 @@ export default function DleEditor({ onClose, initialDles }) {
                     onDragOver={e => onDragOver(e, index)}
                     onDrop={e => onDrop(e, index)}
                     onDragEnd={onDragEnd}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gray-900 border border-gray-800 hover:border-gray-700 group transition-colors cursor-grab active:cursor-grabbing"
+                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-900 group transition-colors cursor-grab active:cursor-grabbing"
                   >
-                    {/* Drag handle */}
-                    <span className="text-gray-600 group-hover:text-gray-500 select-none text-base leading-none shrink-0">
-                      ⠿
-                    </span>
-                    {/* Index + name */}
-                    <span className="text-xs text-gray-600 font-mono w-5 shrink-0 text-right">
-                      {index + 1}
-                    </span>
-                    <span className="flex-1 text-sm text-gray-200 truncate">
-                      {dle.name}
-                    </span>
-                    {/* Remove */}
+                    <span className="text-gray-700 group-hover:text-gray-500 select-none text-sm leading-none shrink-0">⠿</span>
+                    <span className="text-xs text-gray-600 font-mono w-4 shrink-0 text-right">{index + 1}</span>
+                    <span className="flex-1 text-sm text-gray-300 truncate min-w-0">{dle.name}</span>
                     <button
                       onClick={() => removeDle(dle.url)}
-                      className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-600 hover:text-red-400 hover:bg-gray-800 transition-colors opacity-0 group-hover:opacity-100"
+                      className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
                       title="Remove"
-                    >
-                      ✕
-                    </button>
+                    >✕</button>
                   </div>
                 ))}
               </div>
@@ -153,38 +142,36 @@ export default function DleEditor({ onClose, initialDles }) {
           </div>
         </div>
 
-        {/* Right panel — Aukspot browser */}
-        <div className="flex flex-col flex-1 bg-gray-950">
+        {/* Right panel — Aukspot browser, fills remaining width */}
+        <div className="flex flex-col flex-1 min-w-0 bg-gray-950 overflow-hidden">
           {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
-            <h2 className="text-base font-semibold text-white">All Dles</h2>
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 shrink-0">
+            <h2 className="text-sm font-semibold text-white">All Dles</h2>
             {!loading && !fetchError && (
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-gray-300">
-                {allDles.length} total
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-gray-400">
+                {filteredDles.length}{activeCategory !== 'All' || search ? ` / ${allDles.length}` : ''}
               </span>
             )}
           </div>
 
           {/* Search */}
-          <div className="px-4 pt-3 pb-2 shrink-0">
+          <div className="px-3 pt-2 pb-1.5 shrink-0">
             <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600 shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
               <input
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search dles..."
-                className="w-full pl-9 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
+                placeholder="Search..."
+                className="w-full pl-8 pr-7 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors"
               />
               {search && (
                 <button
                   onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"
-                >
-                  ✕
-                </button>
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 text-xs"
+                >✕</button>
               )}
             </div>
           </div>
@@ -192,17 +179,17 @@ export default function DleEditor({ onClose, initialDles }) {
           {/* Category pills */}
           <div
             ref={categoryBarRef}
-            className="flex gap-1.5 px-4 pb-3 overflow-x-auto shrink-0 scrollbar-none"
+            className="flex gap-1 px-3 pb-1.5 overflow-x-auto shrink-0"
             style={{ scrollbarWidth: 'none' }}
           >
             {CATEGORIES.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                   activeCategory === cat
                     ? 'text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    : 'bg-gray-800 text-gray-500 hover:bg-gray-700 hover:text-gray-300'
                 }`}
                 style={activeCategory === cat ? { backgroundColor: '#E8500A' } : {}}
               >
@@ -212,41 +199,37 @@ export default function DleEditor({ onClose, initialDles }) {
           </div>
 
           {/* Dle list */}
-          <div className="flex-1 overflow-y-auto px-3 pb-2">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full gap-3">
-                <div className="w-6 h-6 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
-                <p className="text-sm text-gray-500">Loading dle list...</p>
+                <div className="w-5 h-5 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+                <p className="text-xs text-gray-500">Loading...</p>
               </div>
             ) : fetchError ? (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-8">
-                <p className="text-gray-500 text-sm">Couldn't load the dle list</p>
-                <p className="text-gray-700 text-xs">Check your connection and reopen the editor</p>
+              <div className="flex flex-col items-center justify-center h-full gap-1.5 text-center px-8">
+                <p className="text-gray-500 text-sm">Couldn't load dle list</p>
+                <p className="text-gray-700 text-xs">Check your connection and reopen</p>
               </div>
             ) : filteredDles.length === 0 ? (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-gray-600 text-sm">No dles match your search</p>
+              <div className="flex items-center justify-center h-24">
+                <p className="text-gray-600 text-sm">No matches</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col">
                 {filteredDles.map(dle => {
                   const isActive = activeUrls.has(dle.url)
                   return (
                     <div
                       key={dle.url}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-gray-900/50 opacity-50'
-                          : 'hover:bg-gray-900'
+                      className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${
+                        isActive ? 'opacity-40' : 'hover:bg-gray-900'
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-200 truncate">{dle.name}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{dle.category}</p>
-                      </div>
+                      <span className="flex-1 text-sm text-gray-200 truncate min-w-0">{dle.name}</span>
+                      <span className="text-xs text-gray-600 shrink-0 hidden sm:block">{dle.category}</span>
                       <button
                         onClick={() => toggleDle(dle)}
-                        className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
+                        className={`shrink-0 w-6 h-6 flex items-center justify-center rounded text-xs font-semibold transition-colors ${
                           isActive
                             ? 'bg-gray-800 text-gray-500 hover:bg-gray-700 hover:text-gray-300'
                             : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
@@ -265,10 +248,10 @@ export default function DleEditor({ onClose, initialDles }) {
       </div>
 
       {/* Bottom bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-gray-800 bg-gray-900 shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-800 bg-gray-900 shrink-0">
         <button
           onClick={onClose}
-          className="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-colors"
         >
           ← Back
         </button>
@@ -279,7 +262,7 @@ export default function DleEditor({ onClose, initialDles }) {
           <button
             onClick={handleSave}
             disabled={activeDles.length === 0}
-            className="px-6 py-2 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-1.5 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: activeDles.length > 0 ? '#E8500A' : undefined }}
           >
             Save & Close
