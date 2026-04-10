@@ -43,6 +43,7 @@ export default function DleEditor({ onClose, initialDles }) {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
   const dragIndex = useRef(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
   const categoryBarRef = useRef(null)
 
   useEffect(() => {
@@ -92,11 +93,14 @@ export default function DleEditor({ onClose, initialDles }) {
   const onDragOver = (e, index) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    setDragOverIndex(index)
   }
 
   const onDrop = (e, index) => {
     e.preventDefault()
     const from = dragIndex.current
+    setDragOverIndex(null)
+    dragIndex.current = null
     if (from === null || from === index) return
     setActiveDles(prev => {
       const next = [...prev]
@@ -104,11 +108,26 @@ export default function DleEditor({ onClose, initialDles }) {
       next.splice(index, 0, moved)
       return next
     })
-    dragIndex.current = null
   }
 
   const onDragEnd = () => {
     dragIndex.current = null
+    setDragOverIndex(null)
+  }
+
+  // Calculate per-row translateY for the shift animation
+  const getRowTransform = (index) => {
+    const from = dragIndex.current
+    if (from === null || dragOverIndex === null || from === dragOverIndex) return 'translateY(0)'
+    const ROW_HEIGHT = 32 // approximate px height of each row
+    if (from < dragOverIndex) {
+      // dragging downward — rows between from+1 and dragOverIndex shift up
+      if (index > from && index <= dragOverIndex) return `translateY(-${ROW_HEIGHT}px)`
+    } else {
+      // dragging upward — rows between dragOverIndex and from-1 shift down
+      if (index >= dragOverIndex && index < from) return `translateY(${ROW_HEIGHT}px)`
+    }
+    return 'translateY(0)'
   }
 
   return (
@@ -142,27 +161,41 @@ export default function DleEditor({ onClose, initialDles }) {
                 <p className="text-gray-700 text-xs">Add from the list →</p>
               </div>
             ) : (
-              <div className="flex flex-col">
-                {activeDles.map((dle, index) => (
-                  <div
-                    key={dle.url}
-                    draggable
-                    onDragStart={e => onDragStart(e, index)}
-                    onDragOver={e => onDragOver(e, index)}
-                    onDrop={e => onDrop(e, index)}
-                    onDragEnd={onDragEnd}
-                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-900 group transition-colors cursor-grab active:cursor-grabbing"
-                  >
-                    <span className="text-gray-700 group-hover:text-gray-500 select-none text-sm leading-none shrink-0">⠿</span>
-                    <span className="text-xs text-gray-600 font-mono w-4 shrink-0 text-right">{index + 1}</span>
-                    <span className="flex-1 text-sm text-gray-300 truncate min-w-0">{dle.name}</span>
-                    <button
-                      onClick={() => removeDle(dle.url)}
-                      className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
-                      title="Remove"
-                    >✕</button>
-                  </div>
-                ))}
+              <div className="flex flex-col relative">
+                {activeDles.map((dle, index) => {
+                  const isDragging = dragIndex.current === index
+                  const isDropTarget = dragOverIndex === index && !isDragging
+                  return (
+                    <div key={dle.url} className="relative">
+                      {/* Drop indicator line — appears above this row when it's the target */}
+                      {isDropTarget && (
+                        <div className="absolute top-0 left-2 right-2 h-0.5 bg-orange-500 rounded-full z-10 -translate-y-px pointer-events-none" />
+                      )}
+                      <div
+                        draggable
+                        onDragStart={e => onDragStart(e, index)}
+                        onDragOver={e => onDragOver(e, index)}
+                        onDrop={e => onDrop(e, index)}
+                        onDragEnd={onDragEnd}
+                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-900 group cursor-grab active:cursor-grabbing"
+                        style={{
+                          opacity: isDragging ? 0.4 : 1,
+                          transform: getRowTransform(index),
+                          transition: 'transform 150ms ease, opacity 150ms ease',
+                        }}
+                      >
+                        <span className="text-gray-700 group-hover:text-gray-500 select-none text-sm leading-none shrink-0">⠿</span>
+                        <span className="text-xs text-gray-600 font-mono w-4 shrink-0 text-right">{index + 1}</span>
+                        <span className="flex-1 text-sm text-gray-300 truncate min-w-0">{dle.name}</span>
+                        <button
+                          onClick={() => removeDle(dle.url)}
+                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
+                          title="Remove"
+                        >✕</button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
