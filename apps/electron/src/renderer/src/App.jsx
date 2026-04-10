@@ -554,8 +554,9 @@ powered by Jojo labs`
   // Username / colour picker
   if (screen === 'username') {
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-6">
+      <div className="min-h-screen bg-gray-950 flex flex-col">
         <TitleBar />
+        <div className="flex flex-col flex-1 items-center justify-center gap-6">
         <img src={logo} alt="Dles Night" className="h-16 w-auto" />
         <div className="flex flex-col items-center gap-3">
           <p className="text-gray-400">What's your name?</p>
@@ -636,6 +637,7 @@ powered by Jojo labs`
           >
             Let's go
           </button>
+        </div>
         </div>
       </div>
     )
