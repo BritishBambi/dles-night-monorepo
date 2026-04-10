@@ -29,7 +29,7 @@ export default function DleEditor({ onClose, initialDles }) {
     fetch('https://raw.githubusercontent.com/aukspot/dles/main/src/lib/data/dles.json')
       .then(r => r.json())
       .then(data => {
-        setAllDles(data.map(d => ({ name: d.name, url: d.url, category: d.category ?? 'Miscellaneous' })))
+        setAllDles(data.map(d => ({ name: d.name, url: d.url, category: d.category ?? 'Miscellaneous', description: d.description ?? '' })))
         setLoading(false)
       })
       .catch(() => {
@@ -92,7 +92,13 @@ export default function DleEditor({ onClose, initialDles }) {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-gray-950 text-white overflow-hidden">
+    <div className="dle-editor flex flex-col h-screen w-full bg-gray-950 text-white overflow-hidden">
+      <style>{`
+        .dle-editor ::-webkit-scrollbar { width: 6px; }
+        .dle-editor ::-webkit-scrollbar-track { background: transparent; }
+        .dle-editor ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        .dle-editor ::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+      `}</style>
       <TitleBar />
 
       {/* Main content */}
@@ -225,8 +231,12 @@ export default function DleEditor({ onClose, initialDles }) {
                         isActive ? 'opacity-40' : 'hover:bg-gray-900'
                       }`}
                     >
-                      <span className="flex-1 text-sm text-gray-200 truncate min-w-0">{dle.name}</span>
-                      <span className="text-xs text-gray-600 shrink-0 hidden sm:block">{dle.category}</span>
+                      <span className="text-sm text-gray-200 shrink-0">{dle.name}</span>
+                      {dle.description && (
+                        <span className="flex-1 text-xs text-gray-500 truncate min-w-0">— {dle.description}</span>
+                      )}
+                      {!dle.description && <span className="flex-1" />}
+                      <span className="text-xs text-gray-600 shrink-0">{dle.category}</span>
                       <button
                         onClick={() => toggleDle(dle)}
                         className={`shrink-0 w-6 h-6 flex items-center justify-center rounded text-xs font-semibold transition-colors ${
