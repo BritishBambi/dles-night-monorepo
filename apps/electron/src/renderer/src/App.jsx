@@ -394,6 +394,27 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  const handleReturnToMenu = async () => {
+    if (isElectron) {
+      window.api.dleView.destroy()
+    }
+    if (rtcRef.current) {
+      rtcRef.current.disconnect()
+      rtcRef.current = null
+    }
+    setCurrentIndex(0)
+    setSessionResults([])
+    setSessionComplete(false)
+    setShowRecap(false)
+    setStreaming(false)
+    setStreamEnded(false)
+    setMessages([])
+    setNotes({})
+    setSessionNotes([])
+    setConnectedUsers([])
+    setScreen('menu')
+  }
+
   const handleEndSession = async () => {
     // Hide the WebContentsView so the recap screen is visible
     if (isElectron) {
@@ -557,7 +578,7 @@ powered by Jojo labs`
       <div className="min-h-screen bg-gray-950 flex flex-col">
         <TitleBar />
         <div className="flex flex-col flex-1 items-center justify-center gap-6">
-        <img src={logo} alt="Dles Night" className="h-16 w-auto" />
+        <img src={logo} alt="Dles Night" className="h-16 w-auto cursor-pointer" onClick={() => setScreen('menu')} />
         <div className="flex flex-col items-center gap-3">
           <p className="text-gray-400">What's your name?</p>
           <input
@@ -650,7 +671,7 @@ powered by Jojo labs`
 
       {/* Top bar */}
       <header className="relative flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
-        <img src={logo} alt="Dles Night" className="h-8 w-auto" />
+        <img src={logo} alt="Dles Night" className="h-8 w-auto cursor-pointer" onClick={handleReturnToMenu} />
         <span className="absolute left-1/2 -translate-x-1/2 text-sm text-gray-400">
           {activeDles[currentIndex].name} — Game {currentIndex + 1} of {activeDles.length}
         </span>
