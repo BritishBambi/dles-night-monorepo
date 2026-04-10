@@ -9,6 +9,26 @@ const CATEGORIES = [
   'Shapes/Patterns', 'Vehicles', 'Miscellaneous'
 ]
 
+const CATEGORY_COLORS = {
+  'Words':            { active: 'bg-blue-600',    inactive: 'bg-blue-950 text-blue-300',    border: 'border-blue-600' },
+  'Music':            { active: 'bg-pink-600',    inactive: 'bg-pink-950 text-pink-300',    border: 'border-pink-600' },
+  'Geography':        { active: 'bg-green-600',   inactive: 'bg-green-950 text-green-300',  border: 'border-green-600' },
+  'Math/Logic':       { active: 'bg-purple-600',  inactive: 'bg-purple-950 text-purple-300',border: 'border-purple-600' },
+  'Movies/TV':        { active: 'bg-red-600',     inactive: 'bg-red-950 text-red-300',      border: 'border-red-600' },
+  'Video Games':      { active: 'bg-violet-600',  inactive: 'bg-violet-950 text-violet-300',border: 'border-violet-600' },
+  'Sports':           { active: 'bg-orange-500',  inactive: 'bg-orange-950 text-orange-300',border: 'border-orange-500' },
+  'Trivia':           { active: 'bg-sky-600',     inactive: 'bg-sky-950 text-sky-300',      border: 'border-sky-600' },
+  'History':          { active: 'bg-amber-700',   inactive: 'bg-amber-950 text-amber-300',  border: 'border-amber-700' },
+  'Science/Nature':   { active: 'bg-teal-600',    inactive: 'bg-teal-950 text-teal-300',    border: 'border-teal-600' },
+  'Colors':           { active: 'bg-amber-500',   inactive: 'bg-amber-950 text-amber-300',  border: 'border-amber-500' },
+  'Estimation':       { active: 'bg-yellow-500',  inactive: 'bg-yellow-950 text-yellow-300',border: 'border-yellow-500' },
+  'Food':             { active: 'bg-lime-600',    inactive: 'bg-lime-950 text-lime-300',    border: 'border-lime-600' },
+  'Card/Board Games': { active: 'bg-cyan-600',    inactive: 'bg-cyan-950 text-cyan-300',    border: 'border-cyan-600' },
+  'Shapes/Patterns':  { active: 'bg-indigo-600',  inactive: 'bg-indigo-950 text-indigo-300',border: 'border-indigo-600' },
+  'Vehicles':         { active: 'bg-slate-500',   inactive: 'bg-slate-800 text-slate-300',  border: 'border-slate-500' },
+  'Miscellaneous':    { active: 'bg-zinc-500',    inactive: 'bg-zinc-800 text-zinc-300',    border: 'border-zinc-500' },
+}
+
 export default function DleEditor({ onClose, initialDles }) {
   const [activeDles, setActiveDles] = useState(() => {
     try {
@@ -185,23 +205,25 @@ export default function DleEditor({ onClose, initialDles }) {
           {/* Category pills */}
           <div
             ref={categoryBarRef}
-            className="flex gap-1 px-3 pb-1.5 overflow-x-auto shrink-0"
-            style={{ scrollbarWidth: 'none' }}
+            className="flex flex-wrap gap-1 px-3 pb-1.5 shrink-0"
           >
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                  activeCategory === cat
-                    ? 'text-white'
-                    : 'bg-gray-800 text-gray-500 hover:bg-gray-700 hover:text-gray-300'
-                }`}
-                style={activeCategory === cat ? { backgroundColor: '#E8500A' } : {}}
-              >
-                {cat}
-              </button>
-            ))}
+            {CATEGORIES.map(cat => {
+              const isSelected = activeCategory === cat
+              const colors = cat === 'All'
+                ? { active: 'bg-orange-500', inactive: 'bg-gray-800 text-gray-300' }
+                : CATEGORY_COLORS[cat] ?? { active: 'bg-gray-600', inactive: 'bg-gray-800 text-gray-300' }
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                    isSelected ? `${colors.active} text-white` : colors.inactive
+                  }`}
+                >
+                  {cat}
+                </button>
+              )
+            })}
           </div>
 
           {/* Dle list */}
@@ -224,10 +246,11 @@ export default function DleEditor({ onClose, initialDles }) {
               <div className="flex flex-col">
                 {filteredDles.map(dle => {
                   const isActive = activeUrls.has(dle.url)
+                  const borderClass = CATEGORY_COLORS[dle.category]?.border ?? 'border-gray-700'
                   return (
                     <div
                       key={dle.url}
-                      className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${
+                      className={`flex items-center gap-2 pl-2 pr-3 py-1.5 border-l-2 ${borderClass} transition-colors ${
                         isActive ? 'opacity-40' : 'hover:bg-gray-900'
                       }`}
                     >
