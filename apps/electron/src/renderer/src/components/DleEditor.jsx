@@ -124,21 +124,6 @@ export default function DleEditor({ onClose, initialDles }) {
     setDragOverIndex(null)
   }
 
-  // Calculate per-row translateY for the shift animation
-  // dragOverIndex is now an insertion point (0..n), not a row index
-  const getRowTransform = (index) => {
-    const from = dragIndex.current
-    if (from === null || dragOverIndex === null) return 'translateY(0)'
-    const ROW_HEIGHT = 32
-    if (dragOverIndex > from) {
-      // dragging downward — rows from+1 to insertAt-1 shift up
-      if (index > from && index < dragOverIndex) return `translateY(-${ROW_HEIGHT}px)`
-    } else {
-      // dragging upward — rows insertAt to from-1 shift down
-      if (index >= dragOverIndex && index < from) return `translateY(${ROW_HEIGHT}px)`
-    }
-    return 'translateY(0)'
-  }
 
   return (
     <div className="dle-editor flex flex-col h-screen w-full bg-gray-950 text-white overflow-hidden">
@@ -187,8 +172,6 @@ export default function DleEditor({ onClose, initialDles }) {
                       className="relative flex items-center gap-2 px-2 py-1.5 hover:bg-gray-900 group cursor-grab active:cursor-grabbing"
                       style={{
                         opacity: isDragging ? 0.4 : 1,
-                        transform: getRowTransform(index),
-                        transition: 'transform 150ms ease, opacity 150ms ease',
                       }}
                     >
                       {showLineTop && (
