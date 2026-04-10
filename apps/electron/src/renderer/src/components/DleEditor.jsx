@@ -161,38 +161,37 @@ export default function DleEditor({ onClose, initialDles }) {
                 <p className="text-gray-700 text-xs">Add from the list →</p>
               </div>
             ) : (
-              <div className="flex flex-col relative">
+              <div className="flex flex-col">
                 {activeDles.map((dle, index) => {
                   const isDragging = dragIndex.current === index
                   const isDropTarget = dragOverIndex === index && !isDragging
                   return (
-                    <div key={dle.url} className="relative">
-                      {/* Drop indicator line — appears above this row when it's the target */}
+                    <div
+                      key={dle.url}
+                      draggable
+                      onDragStart={e => onDragStart(e, index)}
+                      onDragOver={e => onDragOver(e, index)}
+                      onDrop={e => onDrop(e, index)}
+                      onDragEnd={onDragEnd}
+                      className="relative flex items-center gap-2 px-2 py-1.5 hover:bg-gray-900 group cursor-grab active:cursor-grabbing"
+                      style={{
+                        opacity: isDragging ? 0.4 : 1,
+                        transform: getRowTransform(index),
+                        transition: 'transform 150ms ease, opacity 150ms ease',
+                      }}
+                    >
+                      {/* Drop indicator line — appears at top of target row */}
                       {isDropTarget && (
-                        <div className="absolute top-0 left-2 right-2 h-0.5 bg-orange-500 rounded-full z-10 -translate-y-px pointer-events-none" />
+                        <div className="absolute top-0 left-2 right-2 h-0.5 bg-orange-500 rounded-full z-10 pointer-events-none" />
                       )}
-                      <div
-                        draggable
-                        onDragStart={e => onDragStart(e, index)}
-                        onDragOver={e => onDragOver(e, index)}
-                        onDrop={e => onDrop(e, index)}
-                        onDragEnd={onDragEnd}
-                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-900 group cursor-grab active:cursor-grabbing"
-                        style={{
-                          opacity: isDragging ? 0.4 : 1,
-                          transform: getRowTransform(index),
-                          transition: 'transform 150ms ease, opacity 150ms ease',
-                        }}
-                      >
-                        <span className="text-gray-700 group-hover:text-gray-500 select-none text-sm leading-none shrink-0">⠿</span>
-                        <span className="text-xs text-gray-600 font-mono w-4 shrink-0 text-right">{index + 1}</span>
-                        <span className="flex-1 text-sm text-gray-300 truncate min-w-0">{dle.name}</span>
-                        <button
-                          onClick={() => removeDle(dle.url)}
-                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
-                          title="Remove"
-                        >✕</button>
-                      </div>
+                      <span className="text-gray-700 group-hover:text-gray-500 select-none text-sm leading-none shrink-0">⠿</span>
+                      <span className="text-xs text-gray-600 font-mono w-4 shrink-0 text-right">{index + 1}</span>
+                      <span className="flex-1 text-sm text-gray-300 truncate min-w-0">{dle.name}</span>
+                      <button
+                        onClick={() => removeDle(dle.url)}
+                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
+                        title="Remove"
+                      >✕</button>
                     </div>
                   )
                 })}
