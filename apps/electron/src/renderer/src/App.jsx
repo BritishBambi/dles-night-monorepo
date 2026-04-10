@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { DlesRTC, SessionChat, SessionSync, StickyNotes, supabase, DLES } from '@dles-night/shared'
 import TitleBar from './components/TitleBar'
+import DleEditor from './components/DleEditor'
 import logo from './assets/logo.png'
 
 const SESSION_ID = 'nightsession'
@@ -67,7 +68,7 @@ function StickyNote({ note, onMove, onDelete }) {
 }
 
 function App() {
-  const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game'
+  const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game' | 'editor'
   const [randomMode, setRandomMode] = useState(false)
   const [activeDles, setActiveDles] = useState(DLES)
   const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
@@ -162,16 +163,22 @@ function App() {
   }
 
   const getActiveDles = async () => {
-    if (!randomMode) return DLES
-    try {
-      const res = await fetch('https://raw.githubusercontent.com/aukspot/dles/main/src/lib/data/dles.json')
-      const all = await res.json()
-      const shuffled = [...all].sort(() => Math.random() - 0.5)
-      return shuffled.slice(0, 20).map(d => ({ name: d.name, url: d.url }))
-    } catch (err) {
-      console.error('Failed to fetch dles list:', err)
-      return DLES
+    if (randomMode) {
+      try {
+        const res = await fetch('https://raw.githubusercontent.com/aukspot/dles/main/src/lib/data/dles.json')
+        const all = await res.json()
+        const shuffled = [...all].sort(() => Math.random() - 0.5)
+        return shuffled.slice(0, 20).map(d => ({ name: d.name, url: d.url }))
+      } catch (err) {
+        console.error('Failed to fetch dles list:', err)
+        return DLES
+      }
     }
+    const saved = localStorage.getItem('dleList')
+    if (saved) {
+      try { return JSON.parse(saved) } catch {}
+    }
+    return DLES
   }
 
   useEffect(() => {
@@ -524,13 +531,23 @@ powered by Jojo labs`
           </div>
 
           <button
-            disabled
-            className="text-xs text-gray-700 cursor-not-allowed"
+            onClick={() => setScreen('editor')}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
           >
             Edit Dle List
           </button>
         </div>
       </div>
+    )
+  }
+
+  // Dle editor
+  if (screen === 'editor') {
+    return (
+      <DleEditor
+        onClose={() => setScreen('menu')}
+        initialDles={activeDles}
+      />
     )
   }
 
