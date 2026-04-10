@@ -14,6 +14,7 @@ export class DlesRTC {
     this.connected = false
     this.offerInFlight = false
     this.hasStream = false
+    this._offerTimeout = null
     this.onConnectionState = null
   }
 
@@ -248,6 +249,7 @@ export class DlesRTC {
         console.log('Viewer setting remote description')
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
         pc.remoteDescriptionSet = true
+        clearTimeout(this._offerTimeout)
         this.offerInFlight = false
         for (const candidate of pc.pendingCandidates) {
           await pc.addIceCandidate(candidate)
@@ -284,6 +286,12 @@ export class DlesRTC {
 
   async _sendOffer(pc) {
     this.offerInFlight = true
+    this._offerTimeout = setTimeout(() => {
+      if (this.offerInFlight) {
+        console.log('[DlesRTC] Offer timed out — resetting offerInFlight')
+        this.offerInFlight = false
+      }
+    }, 10000)
     pc.addTransceiver('video', { direction: 'recvonly' })
     pc.addTransceiver('audio', { direction: 'recvonly' })
     const offer = await pc.createOffer()
