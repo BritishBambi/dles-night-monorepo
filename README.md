@@ -1,6 +1,6 @@
 # Dles Night
 
-A real-time social viewing platform built for a Discord group who play daily reset puzzle games ("dles") together most evenings. One person — Julie — hosts and plays while everyone else watches, shouts suggestions, and contributes through a shared social layer.
+A real-time social viewing platform built for a Discord group who play daily reset puzzle games ("dles") together most evenings. Julie hosts and plays while everyone else watches, shouts suggestions, and contributes through a shared social layer.
 
 This is a **Turborepo monorepo** containing two applications and a shared package:
 
@@ -72,7 +72,7 @@ import { DlesRTC, SharedCanvas, SessionChat, SessionSync, StickyNotes, supabase 
 | `canvas.js` | `SharedCanvas` | Real-time shared drawing canvas |
 | `chat.js` | `SessionChat` | Real-time chat |
 | `notes.js` | `StickyNotes` | Real-time sticky notes with late-joiner sync |
-| `session.js` | `SessionSync` | Session state broadcast — results, dle list, win rate |
+| `session.js` | `SessionSync` | Session state broadcast: results, dle list, win rate |
 
 ---
 
@@ -204,7 +204,7 @@ Passing React state into a `useEffect` to initialise a class instance is a known
 
 Deploys automatically on push to `main`.
 
-- **Build command:** `cd apps/web && npm run build` (set manually in Vercel dashboard — Turborepo detection overrides it otherwise)
+- **Build command:** `cd apps/web && npm run build` (set manually in Vercel dashboard; Turborepo auto-detection overrides the default otherwise)
 - **Output directory:** `apps/web/dist`
 - **Environment variables:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`
 
@@ -304,6 +304,5 @@ Responsive pass for portrait mobile — collapsible sidebar, repositioned toolba
 
 ## Acknowledgements
 
-- Julie — for being the host, product owner, and QA tester simultaneously, and for designing the branding
-- [aukspot/dles](https://github.com/aukspot/dles) — the open-source index of 696+ daily games that powers Random Mode
-- Claude (Anthropic) — architecture, planning, and implementation throughout the build
+- Julie, for being the host, product owner, and QA tester simultaneously, and for designing the branding
+- [aukspot/dles](https://github.com/aukspot/dles), the open-source index of 696+ daily games that powers Random Mode
