@@ -245,5 +245,5 @@ Responsive pass for portrait mobile: collapsible sidebar, repositioned toolbar, 
 
 ## Acknowledgements
 
-- Julie, for being the host, product owner, and QA tester simultaneously, and for designing the branding
+- Julie, for being the host, product owner, and QA tester simultaneously, and for designing the branding. Oh yeah, also my wife.
 - [aukspot/dles](https://github.com/aukspot/dles), the open-source index of 696+ daily games that powers Random Mode
