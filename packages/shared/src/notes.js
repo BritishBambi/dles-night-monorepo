@@ -9,9 +9,6 @@ export class StickyNotes {
     this._getRect = null
   }
 
-  // Set a reference frame for coordinate normalization/denormalization.
-  // getRect() must return { x, y, width, height } in viewport-absolute pixels.
-  // If not set, falls back to { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }.
   setReferenceFrame(getRect) {
     this._getRect = getRect
   }

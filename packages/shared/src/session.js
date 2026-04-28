@@ -60,7 +60,6 @@ export class SessionSync {
     await new Promise(resolve => {
       this.channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          // Announce presence
           await this.channel.track({ username, colour })
           resolve()
         }

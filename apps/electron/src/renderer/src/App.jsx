@@ -15,74 +15,23 @@ if (import.meta.env.VITE_TURN_URL) {
   })
 }
 
-function StickyNote({ note, onMove, onDelete }) {
-  const ref = useRef(null)
-  const dragging = useRef(false)
-  const offset = useRef({ x: 0, y: 0 })
-
-  const onMouseDown = (e) => {
-    if (e.target.closest('button')) return
-    dragging.current = true
-    offset.current = {
-      x: e.clientX - note.x,
-      y: e.clientY - note.y
-    }
-    e.preventDefault()
-  }
-
-  useEffect(() => {
-    const onMouseMove = (e) => {
-      if (!dragging.current) return
-      onMove(note.id, e.clientX - offset.current.x, e.clientY - offset.current.y)
-    }
-    const onMouseUp = () => { dragging.current = false }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [note.id, onMove])
-
-  return (
-    <div
-      ref={ref}
-      onMouseDown={onMouseDown}
-      className="absolute pointer-events-auto select-none w-48 bg-gray-900 border rounded-xl shadow-lg p-3 flex flex-col gap-1 cursor-grab active:cursor-grabbing"
-      style={{ left: note.x, top: note.y, borderColor: note.colour }}
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold" style={{ color: note.colour }}>
-          {note.username}
-        </span>
-        <button
-          onClick={() => onDelete(note.id)}
-          className="text-gray-600 hover:text-red-400 text-xs leading-none"
-        >
-          ✕
-        </button>
-      </div>
-      <p className="text-sm text-gray-200 break-words">{note.text}</p>
-    </div>
-  )
-}
 
 function App() {
   const [screen, setScreen] = useState('menu') // 'menu' | 'username' | 'game' | 'editor'
   const [randomMode, setRandomMode] = useState(false)
   const [activeDles, setActiveDles] = useState(DLES)
-  const [streamVolume, setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
+  const [streamVolume, _setStreamVolume] = useState(() => parseFloat(localStorage.getItem('streamVolume') ?? '1'))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [streaming, setStreaming] = useState(false)
-  const [streamEnded, setStreamEnded] = useState(false)
-  const [viewerStream, setViewerStream] = useState(null)
+  const [_streamEnded, setStreamEnded] = useState(false)
+  const [viewerStream, _setViewerStream] = useState(null)
   const [messages, setMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [username, setUsername] = useState('')
   const [usernameColour, setUsernameColour] = useState('#E8500A')
   const [sessionResults, setSessionResults] = useState([])
   const [winRate, setWinRate] = useState(null)
-  const [notes, setNotes] = useState({})
+  const [_notes, setNotes] = useState({})
   const [sessionNotes, setSessionNotes] = useState([])
   const [newNoteText, setNewNoteText] = useState('')
   const [showNoteInput, setShowNoteInput] = useState(false)
@@ -133,9 +82,6 @@ function App() {
     try {
       rtcRef.current = new DlesRTC(null, SESSION_ID, ICE_SERVERS)
 
-      // In Electron, getDisplayMedia is intercepted by setDisplayMediaRequestHandler
-      // in main process — it automatically provides the WebContentsView as the source
-      // with loopback audio. No picker dialog appears.
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
@@ -176,7 +122,7 @@ function App() {
     }
     const saved = localStorage.getItem('dleList')
     if (saved) {
-      try { return JSON.parse(saved) } catch {}
+      try { return JSON.parse(saved) } catch (e) { console.error('Failed to parse saved dle list:', e) }
     }
     return DLES
   }
@@ -212,7 +158,6 @@ function App() {
     sessionCompleteRef.current = sessionComplete
   }, [sessionComplete])
 
-  // Create WebContentsView when entering game screen
   useEffect(() => {
     if (screen !== 'game' || !isElectron) return
 
@@ -498,7 +443,6 @@ powered by Jojo labs`
     }
   }, [])
 
-  // Main menu
   if (screen === 'menu') {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -562,7 +506,6 @@ powered by Jojo labs`
     )
   }
 
-  // Dle editor
   if (screen === 'editor') {
     return (
       <DleEditor

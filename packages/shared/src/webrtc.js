@@ -37,7 +37,6 @@ export class DlesRTC {
 
     // 3. Listen for viewer-offer messages from viewers wanting to connect
     this.channel.on('broadcast', { event: 'viewer-offer' }, async ({ payload }) => {
-      console.log('Host received viewer-offer from:', payload.viewerId)
       await this._handleViewerOffer(payload.viewerId, payload.offer)
     })
 
@@ -51,24 +50,12 @@ export class DlesRTC {
 
     await new Promise((resolve) => {
       this.channel.subscribe((status) => {
-        console.log('Host channel status:', status)
         if (status === 'SUBSCRIBED') {
           resolve()
         }
       })
     })
-    let readyCount = 0
-    const broadcastReady = () => {
-      if (!this.channel) return
-      this.channel.send({
-        type: 'broadcast',
-        event: 'host-ready',
-        payload: { ready: true }
-      })
-      readyCount++
-      if (readyCount < 5) setTimeout(broadcastReady, 2000)
-    }
-    setTimeout(broadcastReady, 500)
+    this._startReadyBroadcast()
     return this.localStream
   }
 
@@ -89,7 +76,6 @@ export class DlesRTC {
     })
 
     this.channel.on('broadcast', { event: 'viewer-offer' }, async ({ payload }) => {
-      console.log('Host received viewer-offer from:', payload.viewerId)
       await this._handleViewerOffer(payload.viewerId, payload.offer)
     })
 
@@ -102,15 +88,18 @@ export class DlesRTC {
 
     await new Promise((resolve) => {
       this.channel.subscribe((status) => {
-        console.log('Host channel status:', status)
         if (status === 'SUBSCRIBED') {
           resolve()
         }
       })
     })
+    this._startReadyBroadcast()
+    return this.localStream
+  }
 
+  _startReadyBroadcast() {
     let readyCount = 0
-    const broadcastReady = () => {
+    const broadcast = () => {
       if (!this.channel) return
       this.channel.send({
         type: 'broadcast',
@@ -118,11 +107,9 @@ export class DlesRTC {
         payload: { ready: true }
       })
       readyCount++
-      if (readyCount < 5) setTimeout(broadcastReady, 2000)
+      if (readyCount < 5) setTimeout(broadcast, 2000)
     }
-    setTimeout(broadcastReady, 500)
-
-    return this.localStream
+    setTimeout(broadcast, 500)
   }
 
   // HOST: handle an incoming offer from a viewer
@@ -137,9 +124,7 @@ export class DlesRTC {
       pc.addTrack(track, this.localStream)
     })
 
-    // Log ICE state transitions for this viewer connection
     pc.oniceconnectionstatechange = () => {
-      console.log('[DlesRTC] Host ICE state for viewer', viewerId, ':', pc.iceConnectionState)
     }
 
     // Send ICE candidates to this specific viewer
@@ -163,7 +148,6 @@ export class DlesRTC {
       event: 'host-answer',
       payload: { targetViewer: viewerId, answer }
     })
-    console.log('Host sent answer to viewer:', viewerId)
   }
 
   _makePc() {
@@ -173,7 +157,6 @@ export class DlesRTC {
     pc.pendingCandidates = []
     pc.remoteDescriptionSet = false
     pc.ontrack = ({ streams }) => {
-      console.log('Viewer got track!')
       if (streams[0] && !this.connected) {
         this.connected = true
         this.hasStream = true
@@ -191,7 +174,6 @@ export class DlesRTC {
     }
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState
-      console.log('[DlesRTC] ICE state:', state)
       if (this.onConnectionState) {
         this.onConnectionState(state)
       }
@@ -214,8 +196,7 @@ export class DlesRTC {
     const sendOfferWithPc = (pc) => this._sendOffer(pc)
 
     // Register ALL listeners before subscribing
-    this.channel.on('broadcast', { event: 'test-message' }, ({ payload }) => {
-      console.log('Viewer received test message:', payload.text)
+    this.channel.on('broadcast', { event: 'test-message' }, ({ payload: _payload }) => {
     })
 
     this.channel.on('broadcast', { event: 'host-ready' }, async () => {
@@ -229,7 +210,6 @@ export class DlesRTC {
           delete this.peerConnections['host']
         }
       }
-      console.log('Viewer received host-ready, resetting and sending fresh offer')
 
       // Close old peer connection and make a fresh one
       if (this.peerConnections['host']) {
@@ -242,11 +222,9 @@ export class DlesRTC {
     })
 
     this.channel.on('broadcast', { event: 'host-answer' }, async ({ payload }) => {
-      console.log('Viewer received host-answer, targeting:', payload.targetViewer, 'my id:', this.viewerId)
       if (payload.targetViewer === this.viewerId) {
         const pc = this.peerConnections['host']
         if (pc.remoteDescriptionSet) return
-        console.log('Viewer setting remote description')
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
         pc.remoteDescriptionSet = true
         clearTimeout(this._offerTimeout)
@@ -273,7 +251,6 @@ export class DlesRTC {
     // Subscribe AFTER all listeners are registered
     await new Promise((resolve) => {
       this.channel.subscribe((status) => {
-        console.log('Viewer channel status:', status)
         if (status === 'SUBSCRIBED') resolve()
       })
     })
@@ -288,7 +265,7 @@ export class DlesRTC {
     this.offerInFlight = true
     this._offerTimeout = setTimeout(() => {
       if (this.offerInFlight) {
-        console.log('[DlesRTC] Offer timed out — resetting offerInFlight')
+        console.error('[DlesRTC] Offer timed out — resetting offerInFlight')
         this.offerInFlight = false
       }
     }, 10000)
@@ -327,7 +304,6 @@ export class DlesRTC {
     }
   }
 
-  // Clean up everything
   disconnect() {
     Object.values(this.peerConnections).forEach(pc => pc.close())
     this.peerConnections = {}

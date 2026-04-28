@@ -34,7 +34,9 @@ export default function DleEditor({ onClose, initialDles }) {
     try {
       const saved = localStorage.getItem('dleList')
       if (saved) return JSON.parse(saved)
-    } catch {}
+    } catch (e) {
+      console.error('Failed to parse saved dle list from localStorage:', e)
+    }
     return initialDles ?? []
   })
   const [allDles, setAllDles] = useState([])

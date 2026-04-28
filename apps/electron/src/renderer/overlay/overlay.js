@@ -2,8 +2,6 @@ import { supabase } from '@dles-night/shared'
 
 const SESSION_ID = 'nightsession'
 
-// --- Canvas ---
-
 const canvas = document.getElementById('canvas')
 const ctx = canvas.getContext('2d')
 
@@ -55,8 +53,6 @@ supabase
   )
   .subscribe()
 
-// --- Sticky Notes ---
-
 const notesContainer = document.getElementById('notes')
 const noteEls = {}
 
@@ -64,17 +60,10 @@ function safeColour(c) {
   return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#E8500A'
 }
 
-function escapeHtml(str) {
-  const d = document.createElement('div')
-  d.textContent = str
-  return d.innerHTML
-}
-
 function addNoteEl(note) {
   if (noteEls[note.id]) return
   const el = document.createElement('div')
   const colour = safeColour(note.colour)
-  // Denormalize coordinates for display
   const x = note.x * window.innerWidth
   const y = note.y * window.innerHeight
   el.style.cssText = `
@@ -88,18 +77,26 @@ function addNoteEl(note) {
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
     font-family: system-ui, sans-serif;
   `
-  el.innerHTML = `
-    <div style="margin-bottom:4px">
-      <span style="color:${colour};font-size:11px;font-weight:600">${escapeHtml(note.username)}</span>
-    </div>
-    <p style="color:#e5e7eb;font-size:13px;margin:0;word-wrap:break-word">${escapeHtml(note.text)}</p>
-  `
+
+  const header = document.createElement('div')
+  header.style.marginBottom = '4px'
+  const usernameSpan = document.createElement('span')
+  usernameSpan.style.cssText = `color:${colour};font-size:11px;font-weight:600`
+  usernameSpan.textContent = note.username
+  header.appendChild(usernameSpan)
+
+  const textP = document.createElement('p')
+  textP.style.cssText = 'color:#e5e7eb;font-size:13px;margin:0;word-wrap:break-word'
+  textP.textContent = note.text
+
+  el.appendChild(header)
+  el.appendChild(textP)
   noteEls[note.id] = el
   notesContainer.appendChild(el)
 }
 
 function clearAllNotes() {
-  notesContainer.innerHTML = ''
+  notesContainer.replaceChildren()
   Object.keys(noteEls).forEach(id => delete noteEls[id])
 }
 

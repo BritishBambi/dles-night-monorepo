@@ -122,9 +122,6 @@ app.whenReady().then(() => {
     }
   )
 
-  // === DISPLAY MEDIA HANDLER ===
-  // When renderer calls getDisplayMedia(), intercept it and provide
-  // the dleView's webContents as the source — no picker dialog needed.
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     if (dleView && dleView.webContents) {
       callback({ video: dleView.webContents.mainFrame, audio: dleView.webContents.mainFrame, enableLocalEcho: true })
@@ -133,9 +130,6 @@ app.whenReady().then(() => {
     }
   })
 
-  // === IPC HANDLERS ===
-
-  // Create the WebContentsView for the dle panel
   ipcMain.handle('dle-view:create', async () => {
     if (dleView) {
       return { success: true }
@@ -268,11 +262,10 @@ app.whenReady().then(() => {
 
   ipcMain.on('window-minimize', () => mainWindow.minimize())
   ipcMain.on('window-maximize', () => {
-    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
+    if (mainWindow.isMaximized()) mainWindow.unmaximize()
+    else mainWindow.maximize()
   })
   ipcMain.on('window-close', () => mainWindow.close())
-
-  ipcMain.on('ping', () => console.log('pong'))
 
   createWindow()
 
